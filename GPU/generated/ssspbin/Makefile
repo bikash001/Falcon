@@ -1,7 +1,7 @@
 TOPLEVEL := ../../..
 APP=ssspbin
 NVCC=/usr/local/cuda/bin/nvcc
-archtech=sm_20
+archtech=sm_50
 all:
 	$(NVCC) -O3  -arch=$(archtech) -I ../include/ newgpusssp1.cu -o sssp
 	mv sssp $(TOPLEVEL)/bin/GPU/sssp/sssp
