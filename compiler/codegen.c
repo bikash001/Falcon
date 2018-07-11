@@ -31,7 +31,8 @@ char threadstmt[100]= {"int id= blockIdx.x * blockDim.x + threadIdx.x+FALCX;\n"}
 
 // New variable for the FALCON extension
 int level_of_foreach = 0;
-int CONVERT_VERTEX_EDGE;
+int CONVERT_VERTEX_EDGE = 0;
+int merge_bracket = 0;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 
 
@@ -317,6 +318,13 @@ void statement::codeGen(FILE *FP1) {
     }
     if(this->sttype==FOREACH_EBLOCK_STMT) {
         level_of_foreach--;
+        // merge two close bracket into one, since two foreach have been merged
+        if (merge_bracket && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_EBLOCK_STMT) {
+            statement *temp = this->next;
+            this->next = temp->next;
+            temp->next->prev = this;
+            merge_bracket = 0;
+        }
 
         if(FOREACH_FLAG>0)FOREACH_FLAG--;
         if(foreachhostflag>0)foreachhostflag--;
@@ -838,8 +846,11 @@ void statement::codeGen(FILE *FP1) {
         if (this->stassign==NULL) { 	// foreach_stmt with compound statement
         	level_of_foreach++;
 
-	        if (CONVERT_VERTEX_EDGE && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_STMT) {
-	        	statement *next_stmt = this->next;
+	        if (CONVERT_VERTEX_EDGE && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_STMT &&
+                this->itr == POINT_ITYPE && (this->next->itr == NBRS_ITYPE || this->next->itr == INNBRS_ITTYPE ||
+                    this->next->itr == OUTNBRS_ITYPE)) {
+	        	merge_bracket = 1;    // merge two end bracket to one.
+                statement *next_stmt = this->next;
                 
                 // foreach iterator
                 dir_decl *d1=new dir_decl();
@@ -887,9 +898,14 @@ void statement::codeGen(FILE *FP1) {
 			    dst->expr_type = VAR;
 
 				tree_expr *node1 = binaryopnode(expr,NULL,STRUCTREF,-1);
-				node1->rhs = src;
 				tree_expr *node2 = binaryopnode(expr,NULL,STRUCTREF,-1);
-				node2->rhs = dst;
+				if (next_stmt->itr == 4) { // outnbrs
+                    node1->rhs = src;
+                    node2->rhs = dst;    
+                } else {
+                    node1->rhs = dst;
+                    node2->rhs = src;
+                }
 	        	
 	        	pointA->rhs = node1;
 	        	pointB->rhs = node2;
