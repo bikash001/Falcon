@@ -16,11 +16,11 @@ extern int sref;
 extern int MORPH_FLAG;
 extern bool aref;
 extern int EXTRAFLAG,CPUGPU,FUN_EBLOCK_RET;
-extern fun(FILE *FP1,char *, int ,char *,char *[],int ,char *,int ,char *);
- extern std::map<char *,int>newitr;
+extern fun(FILE *FP1,char *, int,char *,char *[],int,char *,int,char *);
+extern std::map<char *,int>newitr;
 extern  std::map<char *,statement *>fnames;//function definition
 extern FILE *FP,*FP1,*FPG,*fp1;
- extern std::map<char *,statement *>fnamescond;//foreach call of function in char *with conditional
+extern std::map<char *,statement *>fnamescond;//foreach call of function in char *with conditional
 extern int genpartitioncodegpu(tree_expr *,dir_decl *);
 extern int genpartitioncodecpu(tree_expr *,dir_decl *);
 extern int codegenupdatefunction(dir_decl *,tree_expr *);
