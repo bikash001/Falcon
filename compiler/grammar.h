@@ -139,7 +139,7 @@ tree_typedecl * createtypedef( enum DATATYPE x) {
     strcpy(ptr->name,dtypenames[x]);
     return ptr;
 }
-tree_typedecl * createlibtypedef( enum LIBDATATYPE x,char *name) {
+tree_typedecl * createlibtypedef( enum LIBDATATYPE x, char *name) {
     tree_typedecl *ptr=new tree_typedecl();
     ptr->libdatatype=x;
     ptr->name=malloc(sizeof(char )*100);
@@ -416,7 +416,7 @@ initforeach(statement **t1ref,statement **temp3ref,char *name1,char *name2,int i
         temp3->expr3->expr_type=VAR;
     }
 }
-initforeach1(statement **temp3ref,char *name1,char *name2,int itr) {
+void initforeach1(statement **temp3ref,char *name1,char *name2,int itr) {
     statement *temp3=*temp3ref;
     dir_decl *d1=currsymtab->findsymbol(name1);
     dir_decl *d2=currsymtab->findsymbol(name2);

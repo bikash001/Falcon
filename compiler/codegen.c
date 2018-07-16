@@ -30,8 +30,8 @@ int unnicnt=0,utcnt=0,singlearr,reduxcnt=0,tempfun=0,partcodegen;
 char threadstmt[100]= {"int id= blockIdx.x * blockDim.x + threadIdx.x+FALCX;\n"};
 
 // New variable for the FALCON extension
-int level_of_foreach = 0;
-int CONVERT_VERTEX_EDGE = 0;
+// int level_of_foreach = 0;
+// extern int CONVERT_VERTEX_EDGE;
 int merge_bracket = 0;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 
@@ -286,6 +286,7 @@ void statement::codeGen(FILE *FP1) {
     if(this->sttype==SBLOCK_STMT) {
         if( this->prev && this->prev->sttype!=FOREACH_STMT ) {
             fprintf(FP1,"{");
+            // fprintf(FP1, "codegen-289 %d\n", this->prev->sttype);
             if(this->prev && this->prev->barrier==1 && this->prev->ker==0 && this->prev->stdecl->dirrhs->params && this->prev->stdecl->dirrhs->params->dirrhs)fprintf(FP1,"int id=%s;\n",this->prev->stdecl->dirrhs->params->dirrhs->name);
             if(Gkernel==0) {
                 if(forcondarr[0]!='\0') {
@@ -317,14 +318,14 @@ void statement::codeGen(FILE *FP1) {
         fprintf(FP1,"}");
     }
     if(this->sttype==FOREACH_EBLOCK_STMT) {
-        level_of_foreach--;
+        // level_of_foreach--;
         // merge two close bracket into one, since two foreach have been merged
-        if (merge_bracket && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_EBLOCK_STMT) {
-            statement *temp = this->next;
-            this->next = temp->next;
-            temp->next->prev = this;
-            merge_bracket = 0;
-        }
+        // if (merge_bracket && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_EBLOCK_STMT) {
+        //     statement *temp = this->next;
+        //     this->next = temp->next;
+        //     temp->next->prev = this;
+        //     merge_bracket = 0;
+        // }
 
         if(FOREACH_FLAG>0)FOREACH_FLAG--;
         if(foreachhostflag>0)foreachhostflag--;
@@ -843,97 +844,114 @@ void statement::codeGen(FILE *FP1) {
         fprintf(FP1,");");
     }
     if(this->sttype==FOREACH_STMT ) {
-        if (this->stassign==NULL) { 	// foreach_stmt with compound statement
-        	level_of_foreach++;
+    //     if (this->stassign==NULL) { 	// foreach_stmt with compound statement
+    //     	level_of_foreach++;
 
-	        if (CONVERT_VERTEX_EDGE && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_STMT &&
-                this->itr == POINT_ITYPE && (this->next->itr == NBRS_ITYPE || this->next->itr == INNBRS_ITTYPE ||
-                    this->next->itr == OUTNBRS_ITYPE)) {
-	        	merge_bracket = 1;    // merge two end bracket to one.
-                statement *next_stmt = this->next;
+	   //      if (CONVERT_VERTEX_EDGE && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_STMT &&
+    //             this->itr == POINT_ITYPE && (this->next->itr == NBRS_ITYPE || this->next->itr == INNBRS_ITTYPE ||
+    //                 this->next->itr == OUTNBRS_ITYPE)) {
+	   //      	merge_bracket = 1;    // merge two end bracket to one.
+    //             statement *next_stmt = this->next;
                 
-                // foreach iterator
-                dir_decl *d1=new dir_decl();
-                d1->name=malloc(sizeof(char)*10);
-                strcpy(d1->name, "e");
-                d1->libdtype=ITERATOR_TYPE;
-                d1->dtype=-1;
-                d1->forit=-1;
-                d1->parent = this->expr1->lhs->parent;
+    //             // foreach iterator
+    //             dir_decl *d1=new dir_decl();
+    //             d1->name=malloc(sizeof(char)*10);
+    //             strcpy(d1->name, "e");
+    //             d1->libdtype=ITERATOR_TYPE;
+    //             d1->dtype=-1;
+    //             d1->forit=-1;
+    //             d1->parent = this->expr1->lhs->parent;
 
-	        	// type declaration
-	        	tree_typedecl *ptr = new tree_typedecl();
-			    ptr->libdatatype = POINT_TYPE;	//point type
-			    ptr->name=malloc(sizeof(char )*100);
-			    strcpy(ptr->name, "point ");
+	   //      	// type declaration
+	   //      	tree_typedecl *ptr = new tree_typedecl();
+			 //    ptr->libdatatype = POINT_TYPE;	//point type
+			 //    ptr->name=malloc(sizeof(char )*100);
+			 //    strcpy(ptr->name, "point ");
 
-			   	// variable
-			    dir_decl *pointA = this->expr1->lhs;
-                pointA->rhs = NULL;
-                pointA->parent = NULL;
-                pointA->libdtype = POINT_TYPE;
-                pointA->dtype = -1;
-                pointA->forit = 0;
-                dir_decl *pointB = next_stmt->expr1->lhs;
+			 //   	// variable
+			 //    dir_decl *pointA = this->expr1->lhs;
+    //             pointA->rhs = NULL;
+    //             pointA->parent = NULL;
+    //             pointA->libdtype = POINT_TYPE;
+    //             pointA->dtype = -1;
+    //             pointA->forit = 0;
+    //             dir_decl *pointB = next_stmt->expr1->lhs;
 
-                pointB->libdtype = POINT_TYPE;
-                pointB->dtype = -1;
-                pointB->parent = NULL;
-                pointB->forit = 0;
-                pointB->rhs = NULL;
+    //             pointB->libdtype = POINT_TYPE;
+    //             pointB->dtype = -1;
+    //             pointB->parent = NULL;
+    //             pointB->forit = 0;
+    //             pointB->rhs = NULL;
 
-                // initializer
-		  		tree_expr *expr = new tree_expr(d1);
-			    expr->name = malloc(sizeof(char)*2);
-			    expr->expr_type = VAR;
+    //             // initializer
+		  // 		tree_expr *expr = new tree_expr(d1);
+			 //    expr->name = malloc(sizeof(char)*2);
+			 //    expr->expr_type = VAR;
 
-			    tree_expr *src = new tree_expr();
-			    src->name = malloc(sizeof(char)*4);
-			    strcpy(src->name, "src");
-			    src->expr_type = VAR;
+			 //    tree_expr *src = new tree_expr();
+			 //    src->name = malloc(sizeof(char)*4);
+			 //    strcpy(src->name, "src");
+			 //    src->expr_type = VAR;
 
-			    tree_expr *dst = new tree_expr();
-			    dst->name = malloc(sizeof(char)*4);
-			    strcpy(dst->name, "dst");
-			    dst->expr_type = VAR;
+			 //    tree_expr *dst = new tree_expr();
+			 //    dst->name = malloc(sizeof(char)*4);
+			 //    strcpy(dst->name, "dst");
+			 //    dst->expr_type = VAR;
 
-				tree_expr *node1 = binaryopnode(expr,NULL,STRUCTREF,-1);
-				tree_expr *node2 = binaryopnode(expr,NULL,STRUCTREF,-1);
-				if (next_stmt->itr == 4) { // outnbrs
-                    node1->rhs = src;
-                    node2->rhs = dst;    
-                } else {
-                    node1->rhs = dst;
-                    node2->rhs = src;
-                }
+				// tree_expr *node1 = binaryopnode(expr,NULL,STRUCTREF,-1);
+				// tree_expr *node2 = binaryopnode(expr,NULL,STRUCTREF,-1);
+				// if (next_stmt->itr == 4) { // outnbrs
+    //                 node1->rhs = src;
+    //                 node2->rhs = dst;    
+    //             } else {
+    //                 node1->rhs = dst;
+    //                 node2->rhs = src;
+    //             }
 	        	
-	        	pointA->rhs = node1;
-	        	pointB->rhs = node2;
-	        	pointA->nextv = pointB;
+	   //      	pointA->rhs = node1;
+	   //      	pointB->rhs = node2;
+	   //      	pointA->nextv = pointB;
 
-	        	// create statement
-	        	tree_decl_stmt *tstmt = new tree_decl_stmt();
-				tstmt->rhs=NULL;
-				tstmt->lhs=ptr;
-				tstmt->dirrhs=pointA;
+	   //      	// create statement
+	   //      	tree_decl_stmt *tstmt = new tree_decl_stmt();
+				// tstmt->rhs=NULL;
+				// tstmt->lhs=ptr;
+				// tstmt->dirrhs=pointA;
 
-				statement *stmt=new statement();
-				stmt->sttype=DECL_STMT;
-				stmt->expr1=NULL;
-				stmt->name=NULL;
-				stmt->lineno=0;
-				stmt->stdecl = tstmt;
+				// statement *stmt=new statement();
+				// stmt->sttype=DECL_STMT;
+				// stmt->expr1=NULL;
+				// stmt->name=NULL;
+				// stmt->lineno=0;
+				// stmt->stdecl = tstmt;
 
-                this->itr = EDGES_ITYPE;
-                this->expr1->lhs = d1;
-	        	this->expr3 = NULL;
+    //             this->itr = EDGES_ITYPE;
+    //             this->expr1->lhs = d1;
+	   //      	this->expr3 = NULL;
 
-				this->next = stmt;
-				stmt->prev = this;
-				stmt->next = next_stmt->next;
-                this->codeGen(FP1);
-	        	return;
-	        }
+				// this->next = stmt;
+				// stmt->prev = this;
+				// stmt->next = next_stmt->next;
+                
+    //             // if (next_stmt->expr4 != NULL) { // condition should be after variable declaration
+    //             //     merge_bracket = 0; // since new if statement is introduced
+    //             // }
+
+    //             this->codeGen(FP1);
+	   //      	return;
+	   //      }
+    //     }
+        if (this->stassign){
+            // fclose(FP1);
+            // exit(0);
+            // printf("%s %s\n", "codegen-943", this->stassign->rhs->name);
+            // for (std::map<char *,statement *>::iterator i = fnames.begin(); i != fnames.end(); ++i)
+            // {
+            //     // if (!strcmp(i->first, this->stassign->rhs->name)) {
+            //         printf("line-947 %s\n", i->first);
+            //         printf("%d %d %d\n", i->second->sttype, i->second->next->sttype, i->second->next->next->sttype);
+            //     // }
+            // }
         }
         
         int it=this->itr;
@@ -1618,8 +1636,6 @@ void statement::codeGen(FILE *FP1) {
                 }
             }
             fprintf(FP1,"\n");
-
-
             if(st && st->next)st->next->codeGen(FP1);
             return;
         }
@@ -2128,6 +2144,7 @@ void statement::codeGen(FILE *FP1) {
                 if(this->ker==1) {
                 }
             }
+// function name with parameters ends here
         }
         if(this->stdecl->dirrhs!=NULL && this->stdecl->dirrhs->tp1==NULL && this->stdecl->lhs->libdatatype==SET_TYPE)fprintf(FP1,"NULL HERE print statement");
     }

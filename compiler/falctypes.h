@@ -245,6 +245,57 @@ public:
     void printcode(int,char *);//genereate code for variable to file
     void printcodearray(int,char *);//genereate code for variable to file
     int  find(dir_decl *,dir_decl *);
+    dir_decl(dir_decl *decl) {
+        next = decl->next;
+        prevv = decl->prevv;
+        nextv = decl->nextv;
+        dev_no = decl->dev_no;
+        name = decl->name;
+        extra_name = decl->extra_name;
+        extra_name1 = decl->extra_name1;
+        extra_name2 = decl->extra_name2;
+        extra_fun = decl->extra_fun;
+        update_fun = decl->update_fun;
+        extra_readfun = decl->extra_readfun;
+        extra_readfun1 = decl->extra_readfun1;
+        ppts = decl->ppts;
+        typelist = decl->typelist;
+        parent = decl->parent;
+        sbrack_flag = decl->sbrack_flag;
+        ordered = decl->ordered;
+        clone = decl->clone;
+        iflag = decl->iflag;
+        read = decl->read;
+        isparam = decl->isparam;
+        it = decl->it;
+        forit = decl->forit;
+        brack_flag = decl->brack_flag;
+        open_brack = decl->open_brack;
+        gpu = decl->gpu;
+        arg = decl->arg;
+        local = decl->local;
+        close_brack = decl->close_brack;
+        arr_flag = decl->arr_flag;
+        stat = decl->stat;
+        type_qual = decl->type_qual;
+        tp1 = decl->tp1;
+        assign = decl->assign;
+        rhs = decl->rhs;
+        structexpr = decl->structexpr;
+        idrhs = decl->idrhs;
+        procd = decl->procd;
+        params = decl->params;
+        parnames = decl->parnames;
+        ptrflag = decl->ptrflag;
+        ptrcnt = decl->ptrcnt;
+        stable = decl->stable;
+        libstable = decl->libstable;
+        decltype = decl->decltype;
+        dtype = decl->dtype;
+        libdtype = decl->libdtype;
+        stype = decl->stype;
+        ctype = decl->ctype;
+    }
 };
 
 enum EXPR_TYPE  {//expression type
@@ -468,6 +519,7 @@ public:
     char  *name;
     bool comma;
     bool feb;
+    class statement *end_stmt; // end statement of foreach statement
     print();
     void codeGen(FILE *FP);
     void codeGen1();

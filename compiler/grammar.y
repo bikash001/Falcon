@@ -69,7 +69,10 @@ bool assflag;
 
 // Variable declaration for FALCON extension
 // #define DEBUGGING
-extern int CONVERT_VERTEX_EDGE;   // defined in codegen.c, flag for different code generation (vertex & edge based)
+int CONVERT_VERTEX_EDGE = 0;   // flag for different code generation (vertex & edge based)
+extern std::set<statement*> foreach_list;
+extern void convert_vertex_edge();
+int level_of_foreach = 0;
 
 %}
 %union {
@@ -1624,7 +1627,7 @@ compound_statement
       #endif
       $$=new tree_node();
     }
-	| compound_begin   block_item_list compound_end{
+	| compound_begin block_item_list compound_end{
 		  #ifdef DEBUGGING
         printf("%s\n", "compound_statement-2");
       #endif
@@ -1645,7 +1648,8 @@ compound_begin
   		stemp->sym->parent=currsymtab->sym;
   		currsymtab=stemp;
   		sblock_begin[sbtop++]=temp3;
-  		if(FDEF!=NULL){
+  		
+      if(FDEF!=NULL){
   			if(FDEF->params!=NULL){
   				FDEF->addsymbols(currsymtab);
   			}
@@ -1921,6 +1925,7 @@ iteration_statement
     }
   | FOREACH b_compound_begin IDENTIFIER IN IDENTIFIER'.'iterator ')' 
     {
+      level_of_foreach++;
       // put variable into symbol table
 		  dir_decl *d1=createdirdeclforeach((char *)$3,(char *)$5,ITERATOR_TYPE,-1,-1,(int)$7);
 		} 
@@ -1933,12 +1938,13 @@ iteration_statement
 				  fnamescond[t1->next->stassign->rhs->name]=temp1;
         }
         temp3->sttype=FOREACH_EBLOCK_STMT;
-        t1->expr4=temp3->expr4; 
+        t1->expr4=temp3->expr4;
         t1->expr5=$4;  
 		    t1->sttype=FOREACH_STMT;
         FOREACH_FUN_FLAG=1;
         t1->feb=1;
         initforeach1(&t1,(char *)$3,(char *)$5,(int)$7);
+        t1->end_stmt = temp3;
 		  } else {
         // printf("%s %d\n", "grammar.y-1813", temp1->prev->sttype);
         if(temp1->expr4!=NULL){
@@ -1953,16 +1959,17 @@ iteration_statement
         temp3->stassign=temp1->stassign;
         fnamescond[temp1->stassign->rhs->name]=temp3;
         temp3->prev->next=temp3;temp1=temp3;
-        // if (temp3->stassign) {
-        //   printf("\n%s %d\n", "grammar.y-1827", temp3->stassign->asstype);
-        // }
+        
+        if(level_of_foreach == 1) foreach_list.insert(temp3);
       }
     	currsymtab=currsymtab->parent;
       KERNEL=0;
       FUNCALL_FLAG=0;
+      level_of_foreach--;
     }
   | FOREACH b_compound_begin IDENTIFIER IN IDENTIFIER ')' 
     {
+      level_of_foreach++;
 		  dir_decl *d1=createdirdeclforeach((char *)$3,(char *)$5,ITERATOR_TYPE,-1,-1,(int)5);
 		}
     conditional_for
@@ -1990,12 +1997,15 @@ iteration_statement
 		    temp3->prev=temp1->prev; 
 			  temp3->stassign=temp1->stassign;
 			  temp3->prev->next=temp3;
-			  temp1=temp3; 
+			  temp1=temp3;
+
+        if(level_of_foreach == 1) foreach_list.insert(temp3);
 	    }
 	    currsymtab=currsymtab->parent;
 	    KERNEL=0;
       FUNCALL_FLAG=0;
-    } { }
+      level_of_foreach--;
+    }
 	;
 
 IN  :  '(' '+' IDENTIFIER ')'    IN1   { 
@@ -2408,13 +2418,20 @@ main(int argc, char *argv[]){
     fprintf(FP,"#include \"../include/HGraph.h\"\n");
     fprintf(FP,"#include \"../include/HSet.h\"\n");
   }
+
   temp->print();
   setparent();
   ERRPRINT=1;
-  // temp->print();
+  temp->print();
   if(errflag!=0){
     printf("skipping codegeneration\n");
     exit(0);
+  }
+
+
+  if(CONVERT_VERTEX_EDGE) {
+    // falcon extension code
+    convert_vertex_edge();
   }
 
   #ifdef DEBUGGING
