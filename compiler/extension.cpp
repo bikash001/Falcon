@@ -33,9 +33,9 @@ void convert_vertex_edge()
 	{
 		statement *forstmt = *ii;
 		if (forstmt->itr == POINT_ITYPE) {
-			statement *target = insert_position(forstmt->stassign->rhs->name);
+			statement *target = insert_position(forstmt->stassign->rhs->name); //SBLOCK_STMT
 			if(target) {
-				statement *next_stmt = target->next;
+				statement *next_stmt = target->next;	//FOREACH_STMT
 				tree_decl_stmt *params = target->prev->stdecl->dirrhs->params;
 				dir_decl *graph = NULL;
 				struct extra_ppts *ppts = NULL;
@@ -64,7 +64,7 @@ void convert_vertex_edge()
 				}
 
 				if (forstmt->expr4) {
-					if (next_stmt->next->itr == OUTNBRS_ITYPE) {
+					if (next_stmt->itr == OUTNBRS_ITYPE) {
 						forstmt->expr4->edge_type = 1;
 					} else {
 						forstmt->expr4->edge_type = 0;
@@ -153,6 +153,8 @@ void convert_vertex_edge()
 				end_stmt->prev->next = end_stmt->next;
 				end_stmt->next->prev = end_stmt->prev;
 			}
+		} else if (forstmt->itr == EDGES_ITYPE) {
+
 		}
 	}
 }
