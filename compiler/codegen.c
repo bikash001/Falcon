@@ -31,7 +31,7 @@ char threadstmt[100]= {"int id= blockIdx.x * blockDim.x + threadIdx.x+FALCX;\n"}
 
 // New variable for the FALCON extension
 // int level_of_foreach = 0;
-// extern int CONVERT_VERTEX_EDGE;
+extern int CONVERT_VERTEX_EDGE;
 int merge_bracket = 0;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 
@@ -2091,9 +2091,19 @@ void statement::codeGen(FILE *FP1) {
                         if(this->ker)strcat(forcondarr,"[id]==");
                         if(this->ker==0) {
                             strcat(forcondarr,"[");
-                            strcat(forcondarr,this->stdecl->dirrhs->params->dirrhs->name);
+                            tree_decl_stmt *d = this->stdecl->dirrhs->params;
+                            if (CONVERT_VERTEX_EDGE && d->lhs->libdatatype == EDGE_TYPE) {
+                                char buff[100];
+                                if (tt1->edge_type) {
+                                    sprintf(buff, "%s.edges[3*%s].ipe\0", d->dirrhs->parent->name, d->dirrhs->name);
+                                } else {
+                                    sprintf(buff, "%s.edges[3*%s+1].ipe\0", d->dirrhs->parent->name, d->dirrhs->name);
+                                }
+                                strcat(forcondarr, buff);
+                            } else {                                
+                                strcat(forcondarr,this->stdecl->dirrhs->params->dirrhs->name);
+                            }
                             strcat(forcondarr,"]==");
-
                         }
                         tt1->rhs->printcode1(tt1->rhs,forcondrhs);
                         strcat(forcondarr,forcondrhs);

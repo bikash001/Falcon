@@ -419,6 +419,7 @@ public:
     tree_expr();//constructor
     tree_expr(tree_expr *);//constructor
     char *cpu_name;//new name for gpu variable after generatring cudaMemcpy
+    bool edge_type;     //used in condition of foreach in vertex-edge conversion, if 0 (outnbrs)
 };
 
 enum STMT_TYPE { //stmt type

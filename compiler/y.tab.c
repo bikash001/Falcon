@@ -6452,8 +6452,10 @@ main(int argc, char *argv[]){
   }
 
 
- // falcon extension code
-  convert_vertex_edge();
+  if(CONVERT_VERTEX_EDGE) {
+    // falcon extension code
+    convert_vertex_edge();
+  }
 
   #ifdef DEBUGGING
     printf("%s\n", "\n***********************\n****parse completed****\n***********************\n");

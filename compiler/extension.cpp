@@ -56,10 +56,19 @@ void convert_vertex_edge()
 							break;
 						} else if(type->libdatatype == GRAPH_TYPE) {
 							graph = params->dirrhs;
+							break;
 						}
 						type = type->next;
 					}
 					params = params->next;
+				}
+
+				if (forstmt->expr4) {
+					if (next_stmt->next->itr == OUTNBRS_ITYPE) {
+						forstmt->expr4->edge_type = 1;
+					} else {
+						forstmt->expr4->edge_type = 0;
+					}
 				}
 
 				// foreach iterator
