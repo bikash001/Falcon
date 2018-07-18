@@ -17,7 +17,7 @@ static statement* insert_position(const char *name)
 			statement *next = it->second->next->next;		// since first next is SBLOCK_STMT
 			if (next->sttype == FOREACH_STMT && (next->itr == NBRS_ITYPE || 
 				next->itr == INNBRS_ITTYPE || next->itr == OUTNBRS_ITYPE)) {
-					return next->prev;
+					return next->prev; // return pointer to SBLOCK_STMT
 			} else {
 				return NULL;
 			}
@@ -26,6 +26,23 @@ static statement* insert_position(const char *name)
 	return NULL;
 }
 
+static statement* get_function(const char *name) {
+	for(std::map<char*, statement*>::iterator it = fnames.begin(); it!=fnames.end(); it++) {
+		if (strcmp(name, it->first) == 0) {
+			return it->second;
+		}
+	}
+	return NULL;
+}
+
+// get a name for variable such that it is not defined again in the same scope
+char* get_variable(statement *stmt) {
+	char buff[10];
+	buff[0] = 'f';
+	buff[1] = 'x';
+	int x = 0;
+	return NULL;
+}
 
 void convert_vertex_edge()
 {
@@ -142,19 +159,57 @@ void convert_vertex_edge()
 				stmt2->sttype = DECL_STMT;
 				stmt2->stdecl = tstmt;
 
-				stmt->next = stmt2;
-				stmt2->prev = stmt;
 				target->next = stmt;
 				stmt->prev = target;
-				stmt2->next = next_stmt->next;
-				next_stmt->next->prev = stmt2;
+				stmt->next = stmt2;
+				stmt2->prev = stmt;
+				
+				if (!forstmt->expr4) {
+					statement *open_bracket = new statement();
+					open_bracket->sttype = SBLOCK_STMT;
+					stmt2->next = open_bracket;
+					open_bracket->prev = stmt2;
+					open_bracket->next = next_stmt->next;
+					next_stmt->next->prev = open_bracket;
+				} else {
+					stmt2->next = next_stmt->next;
+					next_stmt->next->prev = stmt2;
+				}
 
+				// remove extra close bracket
 				statement *end_stmt = next_stmt->end_stmt;
 				end_stmt->prev->next = end_stmt->next;
 				end_stmt->next->prev = end_stmt->prev;
+
+				// add close bracket at the end of function
+				if (!forstmt->expr4) {
+					statement *right = target->prev->end_stmt;
+					statement *left = right->prev;
+					left->next = end_stmt;
+					end_stmt->prev = left;
+					end_stmt->next = right;
+					right->prev = end_stmt;
+					end_stmt->sttype = EBLOCK_STMT;
+				}
 			}
 		} else if (forstmt->itr == EDGES_ITYPE) {
+			// foreach iterator
+            forstmt->itr = POINT_ITYPE;
+            strcpy(forstmt->expr1->lhs->name, "p");
+        	forstmt->expr3 = NULL;
 
+        	statement *function = get_function(forstmt->stassign->rhs->name);
+
+        	// create foreach statement
+        	statement *foreach_stmt = new statement();
+        	foreach_stmt->sttype = FOREACH_STMT;
+        	foreach_stmt->feb = 1;
+        	foreach_stmt->itr = POINT_ITYPE;
+        	dir_decl *d1 = new dir_decl();
+        	d1->name = malloc(sizeof(char)*4);
+
+        	foreach_stmt->expr1 = new tree_expr(d1);
+        	foreach_stmt->expr2 = new tree_expr(forstmt->expr1->lhs);
 		}
 	}
 }

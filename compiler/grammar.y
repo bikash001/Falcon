@@ -1588,6 +1588,7 @@ labeled_statement
   			statement *t2=$3;
   			t2->prev->next=t4;
   			t4->next=t2;
+        t4->end_stmt = temp3;
   		} else {
   		  t4->next=temp3;
   			temp3->prev->next=t4;
@@ -1600,6 +1601,7 @@ labeled_statement
   			statement *t2=$4;
   			t2->prev->next=t4;
   			t4->next=t2;
+        t4->end_stmt = temp3;
   		} else {
   		  t4->next=temp3;; 
   			temp3->prev->next=t4;
@@ -1612,6 +1614,7 @@ labeled_statement
   			statement *t2=$3; 
   			t4->next=t2;
   			t2->prev->next=t4;
+        t4->end_stmt = temp3;
   		} else {
   		  t4->next=temp3;
   			temp3->prev->next=t4;
@@ -1789,6 +1792,7 @@ iteration_statement
   			t1=sblock_begin[sbtop];
   			t1->sttype=WHILE_STMT;
   			t1->expr1=((assign_stmt *)$3)->rhs;
+        t1->end_stmt = temp3;
   		}else{
   			temp3->sttype=WHILE_STMT;
   			temp3->expr1=((assign_stmt *)$3)->rhs;
@@ -1819,6 +1823,7 @@ iteration_statement
   			}
   			t2->next=t1; 
   			t1->prev=t2;
+        t1->end_stmt = temp3;
       } else {
         initforstmt1(&temp3,(assign_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)NULL);
   			statement *t2=temp3;
@@ -1847,6 +1852,7 @@ iteration_statement
   			}
   			t2->next=t1;
   			t1->prev=t2;
+        t1->end_stmt = temp3;
       } else {
         initforstmt1(&temp3,(assign_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)$5);
   		  statement *t2=temp3;
@@ -1877,6 +1883,7 @@ iteration_statement
   			}
   			t2->next=t1;
   			t1->prev=t2;
+        t1->end_stmt = temp3;
   		} else {
         initforstmt(&temp3,(tree_decl_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)NULL);
   			statement *t2=temp3;
@@ -1907,6 +1914,7 @@ iteration_statement
   			}
   			t2->next=t1;
   			t1->prev=t2;
+        t1->end_stmt = temp3;
   	  } else { 
         initforstmt(&temp3,(tree_decl_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)$5);
   			statement *t2=temp3;
@@ -1986,6 +1994,7 @@ iteration_statement
         FOREACH_FUN_FLAG=1;
         t1->sttype=FOREACH_STMT;
         initforeach(&t1,&temp3,(char *)$3,(char *)$5,5);
+        t1->end_stmt = temp3;
 		  } else {
         if(temp3->expr4!=NULL){
 				  fnamescond[temp1->stassign->rhs->name]=temp1;
@@ -2175,6 +2184,7 @@ function_definition
   		de2->next=t2; 
   		t2->prev=de2;
   		t1->lineno=LINENO;
+      t1->end_stmt = temp3;
     }
 	| declaration_specifiers declarator compound_statement{
   		#ifdef DEBUGGING
@@ -2257,6 +2267,7 @@ function_definition
     		if(t1->prev!=NULL)t1->prev->next=t1;
     	}
     	t1->lineno=LINENO;
+      t1->end_stmt = temp3;
     }
 	| declarator declaration_list{de2=temp3;} compound_statement{
       #ifdef DEBUGGING
@@ -2281,6 +2292,7 @@ function_definition
   		de2->next=t2; 
   		t2->prev=de2;
   		t1->lineno=LINENO;
+      t1->end_stmt = temp3;
       #ifdef DEBUGGING
         printf("%s\n", "function_definition-3");
       #endif
@@ -2314,6 +2326,7 @@ function_definition
     		if(t1->prev!=NULL)t1->prev->next=t1;
     	}
     	t1->lineno=LINENO;
+      t1->end_stmt = temp3;
     }
   ;
 

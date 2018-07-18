@@ -520,7 +520,7 @@ public:
     char  *name;
     bool comma;
     bool feb;
-    class statement *end_stmt; // end statement of foreach statement
+    class statement *end_stmt; // end statement of current scope
     print();
     void codeGen(FILE *FP);
     void codeGen1();
