@@ -941,7 +941,7 @@ void statement::codeGen(FILE *FP1) {
 	   //      	return;
 	   //      }
     //     }
-        if (this->stassign){
+        // if (this->stassign){
             // fclose(FP1);
             // exit(0);
             // printf("%s %s\n", "codegen-943", this->stassign->rhs->name);
@@ -952,7 +952,7 @@ void statement::codeGen(FILE *FP1) {
             //         printf("%d %d %d\n", i->second->sttype, i->second->next->sttype, i->second->next->next->sttype);
             //     // }
             // }
-        }
+        // }
         
         int it=this->itr;
         dir_decl *d2=this->expr2->lhs;

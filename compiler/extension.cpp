@@ -8,6 +8,7 @@ std::set<statement*> foreach_list;
 extern std::map<char*, statement*> fnames;
 extern std::map<char*, statement*> fnamescond;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
+extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 
 static statement* insert_position(const char *name)
 {
@@ -46,6 +47,7 @@ char* get_variable(statement *stmt) {
 
 void convert_vertex_edge()
 {
+	printf("CONVERT\n");
 	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
 	{
 		statement *forstmt = *ii;
@@ -200,16 +202,111 @@ void convert_vertex_edge()
 
         	statement *function = get_function(forstmt->stassign->rhs->name);
 
-        	// create foreach statement
+        	// change parameter
+        	tree_decl_stmt *params = function->stdecl->dirrhs->params;
+			struct extra_ppts *ppts = NULL;
+			dir_decl *point = NULL;		// new parameter of Point type
+			dir_decl *edge = NULL;	// old parameter of Edge type
+			while(params) {
+				tree_typedecl *type = params->lhs;
+				while(type) {
+					if (type->libdatatype == EDGE_TYPE) {
+						type->libdatatype = POINT_TYPE;
+						point = new dir_decl(params->dirrhs);
+						point->name = malloc(sizeof(char)*4);
+						edge = params->dirrhs;
+						strcpy(point->name, "p");
+						point->libdtype = EDGE_TYPE;
+						params->dirrhs = point;
+						ppts = point->ppts;
+						edge->parent = point->parent;
+						break;
+					}
+					type = type->next;
+				}
+				params = params->next;
+			}
+
+        	// create foreach statement inside the function
         	statement *foreach_stmt = new statement();
         	foreach_stmt->sttype = FOREACH_STMT;
         	foreach_stmt->feb = 1;
-        	foreach_stmt->itr = POINT_ITYPE;
+        	foreach_stmt->itr = OUTNBRS_ITYPE;
         	dir_decl *d1 = new dir_decl();
         	d1->name = malloc(sizeof(char)*4);
-
+        	strcpy(d1->name, "q");
+        	d1->parent = point->parent;
+        	d1->libdtype = ITERATOR_TYPE;
+        	d1->dtype = -1;
+        	d1->forit = -1;
+        	d1->it = OUTNBRS_ITYPE;
         	foreach_stmt->expr1 = new tree_expr(d1);
-        	foreach_stmt->expr2 = new tree_expr(forstmt->expr1->lhs);
+        	foreach_stmt->expr2 = new tree_expr(point);
+        	
+        	// insert foreach statement
+        	statement *right = function->next->next;
+        	function->next->next = foreach_stmt;
+        	foreach_stmt->prev = function->next;
+        	
+			// type declaration
+        	tree_typedecl *ptr = new tree_typedecl();
+		    ptr->libdatatype = EDGE_TYPE;	//EDGE type
+		    ptr->name=malloc(sizeof(char )*10);
+		    strcpy(ptr->name, "edge ");
+		    ptr->ppts = ppts;
+
+		  	tree_expr *lhs = new tree_expr(edge->parent);
+			tree_expr *rhs = new tree_expr();
+			rhs->name = malloc(sizeof(char)*10);
+			strcpy(rhs->name, "getedge");
+			rhs->expr_type = VAR;
+			tree_expr *node = binaryopnode(lhs, rhs, STRUCTREF, -1);
+			node->nodetype = -10;
+			node->kernel = 0;
+
+			// create arguments
+			tree_expr *pointA = new tree_expr(point);	// first argument
+			pointA->name = malloc(sizeof(char)*4);
+			strcpy(pointA->name, "p");
+			pointA->nodetype = -1;
+			tree_expr *pointB = new tree_expr(d1);  		// second argument
+			pointB->name = malloc(sizeof(char)*4);
+			strcpy(pointB->name, "q");
+			pointB->nodetype = -1;
+			assign_stmt *t1=createassignlhsrhs(-1,NULL,pointA);
+			assign_stmt *t2=createassignlhsrhs(-1,NULL,pointB);
+			t1->next = t2;
+
+			rhs->expr_type = FUNCALL;
+			rhs->arglist = t1;
+			edge->rhs = NULL;
+			edge->rhs = node;
+
+			// get edge from vertices
+        	tree_decl_stmt *tstmt = new tree_decl_stmt();
+			tstmt->lhs = ptr;
+			tstmt->dirrhs = edge;
+			statement *stmt = new statement();
+			stmt->sttype = DECL_STMT;
+			stmt->stdecl = tstmt;
+
+			// insert declaration statement
+			foreach_stmt->next = stmt;
+			stmt->prev = foreach_stmt;
+        	right->prev = stmt;
+        	stmt->next = right;
+
+        	// insert close bracket EBLOCK_STMT
+        	statement *end_foreach = new statement();
+        	end_foreach->sttype = FOREACH_EBLOCK_STMT;
+        	foreach_stmt->end_stmt = end_foreach;
+
+        	statement *lstmt = function->end_stmt->prev;
+        	statement *rstmt = function->end_stmt;
+        	lstmt->next = end_foreach;
+        	end_foreach->prev = lstmt;
+        	end_foreach->next = rstmt;
+        	rstmt->prev = end_foreach;
 		}
 	}
 }

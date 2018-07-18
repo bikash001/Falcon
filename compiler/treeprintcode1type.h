@@ -6,7 +6,7 @@ int EDGEFLAG;
 void printfalcvt(enum DATATYPE dtype) {
     fprintf(FP1,"%s falcvt%d;",dtypenames[dtype],++Temp);
 }
-printcode1settype(tree_expr * expr,char *print_string) {
+void printcode1settype(tree_expr * expr,char *print_string) {
 
     if(expr->rhs->libdtype==FUNCALL) {
         if(!strcmp(expr->rhs->name,"find")&& (strlen(expr->rhs->name)==strlen("find"))) {
@@ -21,7 +21,7 @@ printcode1settype(tree_expr * expr,char *print_string) {
         }
     }
 }
-printcode1collectiontype(tree_expr *expr,char *print_string) {
+void printcode1collectiontype(tree_expr *expr,char *print_string) {
 
     if(expr->rhs->libdtype==FUNCALL) {
 
@@ -100,7 +100,9 @@ printcode1collectiontype(tree_expr *expr,char *print_string) {
 
     }
 }
-printcode1edgetype(tree_expr *expr,char *print_string) {
+void printcode1edgetype(tree_expr *expr,char *print_string) {
+    int utflag_prev = utflag;
+    utflag = 0;
     char arr[100];
     for(int i=0; i<100; i++)arr[i]='\0';
     if(!strcmp(expr->rhs->name,"isdel")) {
@@ -108,40 +110,33 @@ printcode1edgetype(tree_expr *expr,char *print_string) {
         strcat(print_string,".edel[");
         strcat(print_string, expr->lhs->lhs->extra_name1);
         strcat(print_string,"]");
-        return;
-    }
-    if(!strcmp(expr->rhs->name,"weight")) {
+    } else if(!strcmp(expr->rhs->name,"weight")) {
         dir_decl *d1=expr->lhs->lhs;
         if(d1->parent)d1=d1->parent;
 //strcat(print_string,expr->lhs->lhs->parent->name);
         sprintf(arr,"%s.edges[%s*%s%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1,utflagarr[utflag][2]);
         strcat(print_string,arr);
-        return;
-    }
-    if(!strcmp(expr->rhs->name,"src")) { //another way to get source should there??
+    } else if(!strcmp(expr->rhs->name,"src")) { //another way to get source should there??
         dir_decl *d1=expr->lhs->lhs;
         if(d1->parent)d1=d1->parent;
         EDGEFLAG=1;
         sprintf(arr,"%s.edges[%s*%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1);
         strcat(print_string,arr);
-        return;
-    }
-    if(!strcmp(expr->rhs->name,"dst")) {
+    } else if(!strcmp(expr->rhs->name,"dst")) {
         dir_decl *d1=expr->lhs->lhs;
         if(d1->parent)d1=d1->parent;
         sprintf(arr,"%s.edges[%s*%s%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1,utflagarr[utflag][1]);
         strcat(print_string,arr);
-        return;
-    }
-    else {
+    } else {
         char temp[100],temp1[100];
         for(int i=0; i<100; i++)temp[i]=temp1[i]='\0';
         sprintf(temp,"((%s *)(%s.extra))->%s[%s]",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name,expr->lhs->lhs->extra_name1);
         strcat(print_string,temp);
-
+        return;
     }
+    utflag = utflag_prev;
 }
-printcode1pointtype(tree_expr *expr,char *print_string) {
+void printcode1pointtype(tree_expr *expr,char *print_string) {
 
     if(!strcmp(expr->rhs->name,"isdel")) {
         strcat(print_string,expr->lhs->lhs->parent->name);
@@ -226,7 +221,7 @@ int printcode1addtograph(tree_expr *expr,char *print_string) {
     }
     return 0;
 }
-printcode1graphfunction(dir_decl *d1, int off, tree_expr *expr,char *print_string) {
+void printcode1graphfunction(dir_decl *d1, int off, tree_expr *expr,char *print_string) {
     fprintf(stderr,"off=%d",off);
     switch(off) {
     case 0: {
