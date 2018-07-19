@@ -9,6 +9,7 @@ extern std::map<char*, statement*> fnames;
 extern std::map<char*, statement*> fnamescond;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
+extern int CONVERT_VERTEX_EDGE;
 
 static statement* insert_position(const char *name)
 {
@@ -47,11 +48,10 @@ char* get_variable(statement *stmt) {
 
 void convert_vertex_edge()
 {
-	printf("CONVERT\n");
 	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
 	{
 		statement *forstmt = *ii;
-		if (forstmt->itr == POINT_ITYPE) {
+		if (CONVERT_VERTEX_EDGE==1 && forstmt->itr == POINT_ITYPE) {
 			statement *target = insert_position(forstmt->stassign->rhs->name); //SBLOCK_STMT
 			if(target) {
 				statement *next_stmt = target->next;	//FOREACH_STMT
@@ -194,7 +194,7 @@ void convert_vertex_edge()
 					end_stmt->sttype = EBLOCK_STMT;
 				}
 			}
-		} else if (forstmt->itr == EDGES_ITYPE) {
+		} else if (CONVERT_VERTEX_EDGE==2 && forstmt->itr == EDGES_ITYPE) {
 			// foreach iterator
             forstmt->itr = POINT_ITYPE;
             strcpy(forstmt->expr1->lhs->name, "p");
@@ -293,8 +293,19 @@ void convert_vertex_edge()
 			// insert declaration statement
 			foreach_stmt->next = stmt;
 			stmt->prev = foreach_stmt;
-        	right->prev = stmt;
-        	stmt->next = right;
+        	
+        	statement *empty_stmt;
+        	if(forstmt->expr4) {
+        		empty_stmt = new statement();
+        		empty_stmt->sttype = EMPTY_STMT;
+        		stmt->next = empty_stmt;
+        		empty_stmt->prev = stmt;
+        		right->prev = empty_stmt;
+	        	empty_stmt->next = right;
+        	} else {
+        		right->prev = stmt;
+	        	stmt->next = right;
+        	}
 
         	// insert close bracket EBLOCK_STMT
         	statement *end_foreach = new statement();
@@ -303,6 +314,17 @@ void convert_vertex_edge()
 
         	statement *lstmt = function->end_stmt->prev;
         	statement *rstmt = function->end_stmt;
+        	
+        	// insert close bracket for conditional foreach
+        	if (forstmt->expr4) {
+        		statement *eb = new statement();
+        		eb->sttype = EBLOCK_STMT;
+        		empty_stmt->end_stmt = eb;
+        		lstmt->next = eb;
+        		eb->prev = lstmt;
+        		lstmt = eb;
+        	}
+
         	lstmt->next = end_foreach;
         	end_foreach->prev = lstmt;
         	end_foreach->next = rstmt;

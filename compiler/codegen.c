@@ -34,6 +34,7 @@ char threadstmt[100]= {"int id= blockIdx.x * blockDim.x + threadIdx.x+FALCX;\n"}
 extern int CONVERT_VERTEX_EDGE;
 int merge_bracket = 0;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
+char *vb_forcondarr = NULL;    // stores condition in conditional foreach for vertex based
 
 
 void findstructref(dir_decl *d1,tree_expr *expr) {
@@ -289,7 +290,10 @@ void statement::codeGen(FILE *FP1) {
             // fprintf(FP1, "codegen-289 %d\n", this->prev->sttype);
             if(this->prev && this->prev->barrier==1 && this->prev->ker==0 && this->prev->stdecl->dirrhs->params && this->prev->stdecl->dirrhs->params->dirrhs)fprintf(FP1,"int id=%s;\n",this->prev->stdecl->dirrhs->params->dirrhs->name);
             if(Gkernel==0) {
-                if(forcondarr[0]!='\0') {
+                if (CONVERT_VERTEX_EDGE == 2) {
+                    vb_forcondarr = malloc(sizeof(char)*strlen(forcondarr));
+                    strcpy(vb_forcondarr, forcondarr);
+                } else if(forcondarr[0]!='\0') {
                     fprintf(FP1, "\n if( %s ){",forcondarr);
                     for(int i=0; i<200; i++)forcondarr[i]='\0';
                     EXTRA_CRBRK+=1;
@@ -343,7 +347,15 @@ void statement::codeGen(FILE *FP1) {
         fprintf(FP1,"continue;");
     }
     if(this->sttype==EMPTY_STMT) {
-        fprintf(FP1,";");
+        // insert condition of foreach conditional statement for vertex based
+        if(this->end_stmt) {
+            if(vb_forcondarr[0]!='\0') {
+                fprintf(FP1, "\n if( %s ){",vb_forcondarr);
+                free(vb_forcondarr);
+            }
+        } else {
+            fprintf(FP1,";");
+        }
     }
     if(this->sttype==SWITCH_STMT) {
         fprintf(FP1,"switch (");
