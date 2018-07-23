@@ -29,7 +29,7 @@ char *union_string[2]= {"ipe","fpe"};
 char *pdim_string[4]= {"","","2*","3*"};
 char *morphalloc_string[3]= {"","*3","*8"};
 
-char *cpy[]= {"if(","!=cudaSuccess)printf(\"memcpyerror ","\");"};
+char *cpy[]= {"if(","!=cudaSuccess) {\n\tprintf(\"memcpyerror ","\");\n\texit(1);\n}"};
 alloc_extra_fun(dir_decl *t1) {
     int indent=4;
     if (t1->ppts!=NULL) {

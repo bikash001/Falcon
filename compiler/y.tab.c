@@ -6478,4 +6478,3 @@ main(int argc, char *argv[]){
   for(int ii=1;ii<TOT_GPU_GRAPH;ii++)fprintf(FP,"cudaDeviceProp prop%d;\n",ii);
   printf("codegeneration done\n output files \n 1)%s\n %s\n %s \n",source,header,gheader);
 }
-

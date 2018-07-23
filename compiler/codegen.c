@@ -821,8 +821,8 @@ void statement::codeGen(FILE *FP1) {
                                 ep=ep->next;
                             }
                             if(t1->gpu==1 && t1->ppts!=NULL) {
-                                fprintf(FP,"%*s""%scudaMemcpy(%s.extra,&temp,sizeof(%s),cudaMemcpyHostToDevice)!=cudaSuccess) {\n\t",indent," ",cpy[0],t1->name,t1->extra_name);
-                                fprintf(FP,"%*s""printf(\"memcpyerror %d%s\n\treturn 1;\n}\n",indent*2," ",errcnt++,cpy[2]);
+                                fprintf(FP,"%*s""%scudaMemcpy(%s.extra,&temp,sizeof(%s),cudaMemcpyHostToDevice)!=cudaSuccess) {\n",indent," ",cpy[0],t1->name,t1->extra_name);
+                                fprintf(FP,"%*s""\tprintf(\"memcpyerror %d%s\n",indent*2," ",errcnt++,cpy[2]);
                             }
                             fprintf(FP,"%*s""cudaSetDevice(0);\n}\n",indent," ");
                         }
