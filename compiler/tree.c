@@ -2,6 +2,9 @@
 #include<stdlib.h>
 #include "externs.h"
 #include "treeprintcode1type.h"
+
+extern int CONVERT_VERTEX_EDGE;
+
 char  *treenodetypestr[]= {"tree_node ","tree_id ","tree_field ","tree_mapaccess ","tree_idlist","tree_typedecl","tree_argdecl","tree_procdef","tree_expr","tree_expr_rdc","tree_expr_builtin","tree_expr_foreign","tree_expr_mapaccess","tree_sent","tree_sentblock", "tree_assign", "tree_vardecl","tree_foreach","tree_for","tree_arrref","tree_dowhile","tree_switch","tree_if","tree_while","tree_return","tree_call","tree_foreign","tree_nop","tree_int","tree_float","tree_enumconst","tree_string","tree_bool"};
 char *libdatatype_string[]= { //stores library datatype of variable(dir_decl)
     "graph_type"/*0*/,"edge_type"/*1*/,"point_type"/*2*/,"set_type"/*3*/,"collection_type"/*4*/,"g_p_type"/*5*/,"e_p_type"/*6*/,"p_p_type"/*7*/,"iterator_type","lint_type"
@@ -596,7 +599,8 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     else {
                         char temp[200];
                         for(int i=0; i<200; i++)temp[i]='\0';
-                        sprintf(temp,"((%s *)(%s.extra))->%s[%s/2]",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name,expr->lhs->lhs->extra_name);
+                        // sprintf(temp,"((%s *)(%s.extra))->%s[%s/2]",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name,expr->lhs->lhs->extra_name);
+                        sprintf(temp,"((%s *)(%s.extra))->%s",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name);
                         strcat(print_string,temp);
                     }
                     GPSREF=0;
@@ -910,8 +914,12 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
 
                 if(expr->rhs->expr_type==FUNCALL) {
                     if(!strcmp(expr->rhs->name,"read")&&strlen(expr->rhs->name)==strlen(name)) {
-                        strcpy(expr->rhs->name,"read2");
-                        if(INNBRFLAG==1 &&MORPH_FLAG==0)strcpy(expr->rhs->name,"read1");
+                        if(CONVERT_VERTEX_EDGE == 1) {
+                            strcpy(expr->rhs->name, "read3");
+                        } else {
+                            strcpy(expr->rhs->name,"read2");
+                            if(INNBRFLAG==1 &&MORPH_FLAG==0)strcpy(expr->rhs->name,"read1");
+                        }
                         if(MORPH_FLAG==1)strcpy(expr->rhs->name,"readMorph");
                         char arr[100];
                         for(int i=0; i<100; i++)arr[i]='\0';

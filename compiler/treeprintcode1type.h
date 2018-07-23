@@ -1,3 +1,4 @@
+extern int CONVERT_VERTEX_EDGE;
 extern int INNBRFLAG,utflag;
 extern char *union_string[2];
 extern char extra_array[200],*utflagarr[2][3];
@@ -101,8 +102,6 @@ void printcode1collectiontype(tree_expr *expr,char *print_string) {
     }
 }
 void printcode1edgetype(tree_expr *expr,char *print_string) {
-    int utflag_prev = utflag;
-    utflag = 0;
     char arr[100];
     for(int i=0; i<100; i++)arr[i]='\0';
     if(!strcmp(expr->rhs->name,"isdel")) {
@@ -120,12 +119,20 @@ void printcode1edgetype(tree_expr *expr,char *print_string) {
         dir_decl *d1=expr->lhs->lhs;
         if(d1->parent)d1=d1->parent;
         EDGEFLAG=1;
-        sprintf(arr,"%s.edges[%s*%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1);
+        if(CONVERT_VERTEX_EDGE == 1) {
+            sprintf(arr,"%s.index[%s]",d1->name, expr->lhs->lhs->extra_name1);
+        } else {
+            sprintf(arr,"%s.edges[%s*%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1);
+        }
         strcat(print_string,arr);
     } else if(!strcmp(expr->rhs->name,"dst")) {
         dir_decl *d1=expr->lhs->lhs;
         if(d1->parent)d1=d1->parent;
-        sprintf(arr,"%s.edges[%s*%s%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1,utflagarr[utflag][1]);
+        if(CONVERT_VERTEX_EDGE == 1) {
+            sprintf(arr,"%s.edges[%s*%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1);
+        } else {
+            sprintf(arr,"%s.edges[%s*%s%s].ipe",d1->name,utflagarr[utflag][0],expr->lhs->lhs->extra_name1,utflagarr[utflag][1]);
+        }
         strcat(print_string,arr);
     } else {
         char temp[100],temp1[100];
@@ -134,7 +141,6 @@ void printcode1edgetype(tree_expr *expr,char *print_string) {
         strcat(print_string,temp);
         return;
     }
-    utflag = utflag_prev;
 }
 void printcode1pointtype(tree_expr *expr,char *print_string) {
 

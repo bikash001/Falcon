@@ -2107,9 +2107,9 @@ void statement::codeGen(FILE *FP1) {
                             if (CONVERT_VERTEX_EDGE && d->lhs->libdatatype == EDGE_TYPE) {
                                 char buff[100];
                                 if (tt1->edge_type) {
-                                    sprintf(buff, "%s.edges[3*%s].ipe\0", d->dirrhs->parent->name, d->dirrhs->name);
+                                    sprintf(buff, "%s.index[%s]\0", d->dirrhs->parent->name, d->dirrhs->name);
                                 } else {
-                                    sprintf(buff, "%s.edges[3*%s+1].ipe\0", d->dirrhs->parent->name, d->dirrhs->name);
+                                    sprintf(buff, "%s.edges[%s*%s].ipe\0", d->dirrhs->parent->name, utflagarr[utflag][0], d->dirrhs->name);
                                 }
                                 strcat(forcondarr, buff);
                             } else {                                
