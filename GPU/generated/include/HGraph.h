@@ -39,6 +39,7 @@ int readEdges(char *filename);
 int read(char *filename);
 int read1(char *filename);
 int read2(char *filename);
+int read3(char *filename); // used in Falcon extension for reading .gr
 int readMorph(char *filename);
 int optimizeone();
 int optimizetwo();
@@ -477,6 +478,94 @@ cfile.close();
 printf("READ OVER");
 printf("MAX=%d MIN=%d\n ",max,min);
 return 0;
+}
+
+int HGraph::read3(char *file){
+  if(!strcmp(file+strlen(file)-3,"txt")){
+    readEdges(file);
+    return 1;
+  }
+  std::ifstream cfile;
+  cfile.open(file);
+
+  int zerocount=0;
+  // copied from GaloisCpp/trunk/src/FileGraph.h
+  int masterFD = open(file, O_RDONLY);
+  if (masterFD == -1) {
+    printf("FileGraph::structureFromFile: unable to open %s.\n", file);
+    return 1;
+  }
+
+  struct stat buf;
+  int f = fstat(masterFD, &buf);
+  if (f == -1) {
+    printf("FileGraph::structureFromFile: unable to stat %s.\n", file);
+    abort();
+  }
+  size_t masterLength = buf.st_size;
+
+  int _MAP_BASE = MAP_PRIVATE;
+
+  void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
+  if (m == MAP_FAILED) {
+    m = 0;
+    printf("FileGraph::structureFromFile: mmap failed.\n");
+    abort();
+  }
+  uint64_t* fptr = (uint64_t*)m;
+  __attribute__((unused)) uint64_t version = le64toh(*fptr++);
+  //assert(version == 1);
+  uint64_t sizeEdgeTy = le64toh(*fptr++);
+  printf("SIZEOF EDGE TYPE=%d ",sizeEdgeTy);
+  uint64_t numNodes = le64toh(*fptr++);
+  uint64_t numEdges = le64toh(*fptr++);
+  uint64_t *outIdx = fptr;
+  fptr += numNodes;
+  uint32_t *fptr32 = (uint32_t*)fptr;
+  uint32_t *outs = fptr32; 
+  fptr32 += numEdges;
+  if (numEdges % 2) fptr32 += 1;
+  unsigned  *edgeData = (unsigned *)fptr32;
+  
+  // cuda.
+  npoints = numNodes;
+  nedges = numEdges+1;
+  int *count;
+  int max=0,min=99999;
+  unsigned total=0;
+  edims=2;
+  printf("npoints=%d, nedges=%d.\n", (npoints), (nedges));
+  index=(int *)malloc(sizeof(int)*(nedges+1));
+  points=(union float_int *)malloc(sizeof(union float_int )*(npoints+1)*pdims);
+  edges=(union float_int *)malloc(sizeof(union float_int)*(nedges)*edims);
+  for(int i=0;i<(npoints);i++){
+    points[i].ipe=i;
+    if(i>0){
+      total=le64toh(outIdx[i]) - le64toh(outIdx[i - 1]);
+    }
+    else {
+      index[0]=1;
+      total=le64toh(outIdx[0]);
+    }
+    for (unsigned jj = 0; jj <total; ++jj) {
+      unsigned edgeindex = le64toh(outIdx[i - 1]) + 1 + jj;
+      if(i == 0) {
+        edgeindex = 1 + jj;
+      }
+      if(edgeindex > nedges){
+        printf("%d %d %d\n",nedges,edgeindex,i);
+        exit(0);
+      }
+      unsigned dst =le32toh(outs[edgeindex - 1]);
+      edges[2*edgeindex].ipe=dst;
+      edges[2*edgeindex+1].ipe=edgeData[edgeindex - 1];
+      index[edgeindex] = i;
+    }
+  }
+  printf("ZERO COUNT=%d\n ",zerocount);
+  cfile.close();
+  printf("READ OVER");
+  printf("MAX=%d MIN=%d\n ",max,min);
 }
 
 
