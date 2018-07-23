@@ -12,7 +12,7 @@
  #include <sys/mman.h>
 #include <inttypes.h>
 #include </usr/local/cuda/include/cuda.h>
-        #include </usr/local/cuda/include/cuda_runtime_api.h>
+#include </usr/local/cuda/include/cuda_runtime_api.h>
 #include "GGraph.cu"
 #include<thrust/host_vector.h>
 #include<thrust/device_vector.h>
@@ -32,6 +32,7 @@ int writelock[8388608];
 class HGraph: public Graph{
 public:
 int maxnpoints,pnpoints,maxnedges,pnedges;
+int index_type; // if 1, index stores src vertex of edges.
  int init();
 int  readNodes(char *filename,int dims);
 int  printNodes(char *filename,int dims);
@@ -57,6 +58,7 @@ int addEdge(int pos,int src,int dst,int weight);
 int addEdge(int src,int dst,int weight);
 int sortPoints();
 void (*extra_alloc)(HGraph &);//needed for read,copy,allocate,deallocate extra  							                      // properties
+HGraph(): index_type(0) {}
 };
 int HGraph::init(){
 return 0;
@@ -481,6 +483,8 @@ return 0;
 }
 
 int HGraph::read3(char *file){
+  index_type = 1;
+
   if(!strcmp(file+strlen(file)-3,"txt")){
     readEdges(file);
     return 1;
@@ -544,13 +548,15 @@ int HGraph::read3(char *file){
       total=le64toh(outIdx[i]) - le64toh(outIdx[i - 1]);
     }
     else {
-      index[0]=1;
+      index[0]=0;
       total=le64toh(outIdx[0]);
     }
+    unsigned edgeindex;
     for (unsigned jj = 0; jj <total; ++jj) {
-      unsigned edgeindex = le64toh(outIdx[i - 1]) + 1 + jj;
       if(i == 0) {
         edgeindex = 1 + jj;
+      } else {
+        edgeindex = le64toh(outIdx[i - 1]) + 1 + jj;
       }
       if(edgeindex > nedges){
         printf("%d %d %d\n",nedges,edgeindex,i);
@@ -562,10 +568,12 @@ int HGraph::read3(char *file){
       index[edgeindex] = i;
     }
   }
+  edges[0].ipe = edges[1].ipe = 0;
   printf("ZERO COUNT=%d\n ",zerocount);
   cfile.close();
   printf("READ OVER");
   printf("MAX=%d MIN=%d\n ",max,min);
+  return 0;
 }
 
 
@@ -656,8 +664,13 @@ if(cudaMemcpy(graph.pnedges,&(pnedges),sizeof(int),cudaMemcpyHostToDevice)!=cuda
 graph.pdims=pdims;
 graph.edims=edims;
 if(cudaMalloc((void **)&(graph.points),(npoints+1)*sizeof(union float_int)*(pdims))!=cudaSuccess)printf("ALLOC ERRRR\n");
-if(cudaMalloc((void **)&(graph.index),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
-cudaMemcpy(graph.index,index,sizeof(int)*(npoints+1),cudaMemcpyHostToDevice);
+if(index_type == 1) {
+  if(cudaMalloc((void **)&(graph.index),(nedges)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");  
+  cudaMemcpy(graph.index,index,sizeof(int)*(nedges),cudaMemcpyHostToDevice);
+} else {
+  if(cudaMalloc((void **)&(graph.index),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
+  cudaMemcpy(graph.index,index,sizeof(int)*(npoints+1),cudaMemcpyHostToDevice);
+}
 //printf("YY1\n");
 if(cudaMalloc((void **)&(graph.edges),(nedges+1)*MORPH_FACT*sizeof(union float_int)*(edims))!=cudaSuccess)printf("ALLOC EDGE ERROR\n");
 if(cudaMemcpy(graph.points,points,(npoints+1)*sizeof(union float_int)*(pdims),cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 541 HGraph");

@@ -2100,7 +2100,20 @@ void statement::codeGen(FILE *FP1) {
                     char forcondrhs[200];
                     for(int i=0; i<200; i++)forcondrhs[i]='\0';
                     if(tt1->rhs) {
-                        if(this->ker)strcat(forcondarr,"[id]==");
+                        if(this->ker) {
+                            tree_decl_stmt *d = this->stdecl->dirrhs->params;
+                            if (CONVERT_VERTEX_EDGE && d->lhs->libdatatype == EDGE_TYPE) {
+                                char buff[100];
+                                if (tt1->edge_type) {
+                                    sprintf(buff, "[%s.index[id]] == \0", d->dirrhs->parent->name);
+                                } else {
+                                    sprintf(buff, "[%s.edges[%s*id].ipe] == \0", d->dirrhs->parent->name, utflagarr[utflag][0]);
+                                }
+                                strcat(forcondarr, buff);
+                            } else {
+                                strcat(forcondarr,"[id]==");
+                            }
+                        }
                         if(this->ker==0) {
                             strcat(forcondarr,"[");
                             tree_decl_stmt *d = this->stdecl->dirrhs->params;

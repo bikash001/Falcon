@@ -542,13 +542,15 @@ int HGraph::read3(char *file){
       total=le64toh(outIdx[i]) - le64toh(outIdx[i - 1]);
     }
     else {
-      index[0]=1;
+      index[0]=0;
       total=le64toh(outIdx[0]);
     }
+    unsigned edgeindex;
     for (unsigned jj = 0; jj <total; ++jj) {
-      unsigned edgeindex = le64toh(outIdx[i - 1]) + 1 + jj;
       if(i == 0) {
         edgeindex = 1 + jj;
+      } else {
+        edgeindex = le64toh(outIdx[i - 1]) + 1 + jj;
       }
       if(edgeindex > nedges){
         printf("%d %d %d\n",nedges,edgeindex,i);
@@ -560,10 +562,12 @@ int HGraph::read3(char *file){
       index[edgeindex] = i;
     }
   }
+  edges[0].ipe = edges[1].ipe = 0;
   printf("ZERO COUNT=%d\n ",zerocount);
   cfile.close();
   printf("READ OVER");
   printf("MAX=%d MIN=%d\n ",max,min);
+  return 0;
 }
 
 
