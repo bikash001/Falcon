@@ -2401,13 +2401,13 @@ main(int argc, char *argv[]){
   tt1->datatype=INT_TYPE;tt1->name=malloc(sizeof(char)*100);strcpy(tt1->name,dtypenames[tt1->datatype]);
   strcpy(d1->name,"MAX_INT");
   GLOBAL_TABLE.addsymbol(d1,tt1);
-  if(GPUCODEFLAG==1)strcat(source,"cu");
-  if(GPUCODEFLAG==0)strcat(source,"cpp");
-  FP1=fopen(source,"w+");
   int parserr;
 
   parserr=yyparse();
   if(parserr!=0)exit(0);
+  if(GPUCODEFLAG==1)strcat(source,"cu");
+  if(GPUCODEFLAG==0)strcat(source,"cpp");
+  FP1=fopen(source,"w+");
   strcat(header,"h");
   strcat(gheader,"global.h");
   FP=fopen(header,"w+");
@@ -2455,4 +2455,3 @@ main(int argc, char *argv[]){
   for(int ii=1;ii<TOT_GPU_GRAPH;ii++)fprintf(FP,"cudaDeviceProp prop%d;\n",ii);
   printf("codegeneration done\n output files \n 1)%s\n %s\n %s \n",source,header,gheader);
 }
-
