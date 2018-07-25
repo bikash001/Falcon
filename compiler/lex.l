@@ -60,6 +60,7 @@ static int check_type(void);
 %}
 
 %%
+"/*"([^*]|\*+[^*/])*\*+"/"   {/*multiline comment*/}
 "/*".*"*/"                                    { /* comment();*/ printf("COMMENT %s ",yytext);}
 "//".*                                    { /* consume //-comment */ }
 "getType"                                {return GETTYPE;}    
