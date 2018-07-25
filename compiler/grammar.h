@@ -222,7 +222,7 @@ linksinglef1(statement **t4ref,statement *t2,statement *temp3) {
         temp3->prev->next=NULL;
     }
 }
-createifstmt(statement **t4ref,statement **t1ref,statement **t2ref,statement **temp3ref,int flg) {
+void createifstmt(statement **t4ref,statement **t1ref,statement **t2ref,statement **temp3ref,int flg) {
     statement *t4=(*t4ref);
     statement *t2=(*t2ref);
     if(flg==1) {

@@ -687,7 +687,18 @@ void inline  HMIN(int *t1,int t2,int id,int &result){
   //return result;
 }
 
-int  HMAX(int *t1,int t2,int id,int &result){
+void inline  HMIN(int *t1,int t2,int &result){
+  if(*t1 > t2){
+    if (*t1 > t2){
+      volatile int ch=*t1;
+      __sync_val_compare_and_swap(t1,ch,t2);
+      if(*t1<ch)result=1; 
+    }
+  }
+  //return result;
+}
+
+int  HMAX(int *t1,int t2,int &result){
   if(*t1 <  t2){
     if (*t1 < t2){
       volatile int ch=*t1;

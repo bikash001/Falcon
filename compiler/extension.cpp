@@ -38,12 +38,49 @@ static statement* get_function(const char *name) {
 }
 
 // get a name for variable such that it is not defined again in the same scope
-char* get_variable(statement *stmt) {
+char* get_variable(statement *stmt)
+{
 	char buff[10];
 	buff[0] = 'f';
 	buff[1] = 'x';
 	int x = 0;
 	return NULL;
+}
+
+void replace_functions(statement *begin, statement *end, dir_decl *p, dir_decl *q, dir_decl *edge)
+{
+	// printf("TEST %p %p\n", begin, begin->end_stmt);
+	statement *curr = begin;
+	while(curr!=NULL && curr!=end) {
+		// printf("line-70 %p %d\n", curr, curr->sttype);
+		if(curr->sttype == ASSIGN_STMT) {
+			tree_expr *exp = curr->stassign->rhs->rhs;
+			if(exp && exp->expr_type==FUNCALL) {// && strcmp(exp->name, "getweight")==0) {
+				// printf("line %d\n", curr->lineno);
+				// printf("l59 %s\n", exp->name);
+				if(strcmp(exp->name, "getweight") == 0) {
+					assign_stmt *params = exp->arglist;
+					dir_decl *a = params->rhs->lhs;
+					dir_decl *b = params->next->rhs->lhs;
+					if((a==p && b==q) || (a==q && b==p)) {
+						// printf("EXTENSION-62\n");
+						exp->expr_type = VAR;
+						exp->arglist = NULL;
+						strcpy(exp->name, "weight");
+						curr->stassign->rhs->lhs->lhs = edge;
+					}
+				}
+			}
+		} else if (curr->sttype == IF_STMT) {
+			if(curr->f1) {
+				replace_functions(curr->f1, end, p, q, edge);
+			}
+			if(curr->f2) {
+				replace_functions(curr->f2, end, p, q, edge);
+			}
+		}
+		curr = curr->next;
+	}
 }
 
 void convert_vertex_edge()
@@ -193,6 +230,7 @@ void convert_vertex_edge()
 					right->prev = end_stmt;
 					end_stmt->sttype = EBLOCK_STMT;
 				}
+				replace_functions(target->prev, target->prev->end_stmt, pointA, pointB, d);
 			}
 		} else if (CONVERT_VERTEX_EDGE==2 && forstmt->itr == EDGES_ITYPE) {
 			// foreach iterator
