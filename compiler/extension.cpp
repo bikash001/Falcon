@@ -10,6 +10,7 @@ extern std::map<char*, statement*> fnamescond;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 extern int CONVERT_VERTEX_EDGE;
+int falc_ext = 0;
 
 static statement* insert_position(const char *name)
 {
@@ -62,16 +63,24 @@ void replace_functions(statement *begin, statement *end, dir_decl *p, dir_decl *
 					assign_stmt *params = exp->arglist;
 					dir_decl *a = params->rhs->lhs;
 					dir_decl *b = params->next->rhs->lhs;
-					if((a==p && b==q) || (a==q && b==p)) {
+					if((a==p && b==q)) {
 						// printf("EXTENSION-62\n");
 						exp->expr_type = VAR;
 						exp->arglist = NULL;
 						strcpy(exp->name, "weight");
-						curr->stassign->rhs->lhs->lhs = edge;
+						curr->stassign->rhs->lhs = new tree_expr(edge);
+						// curr->stassign->rhs->lhs->lhs = edge;
+					}
+				} else if(strcmp(exp->name, "getedge") == 0) {
+					assign_stmt *params = exp->arglist;
+					dir_decl *a = params->rhs->lhs;
+					dir_decl *b = params->next->rhs->lhs;
+					if((a==p && b==q)) {
+						curr->stassign->rhs = new tree_expr(edge);
 					}
 				}
 			}
-		} else if (curr->sttype == IF_STMT) {
+		} else if (curr->sttype == IF_STMT || curr->sttype == SINGLE_STMT) {
 			if(curr->f1) {
 				replace_functions(curr->f1, end, p, q, edge);
 			}
@@ -103,9 +112,9 @@ void convert_vertex_edge()
 						if (type->libdatatype == POINT_TYPE) {
 							type->libdatatype = EDGE_TYPE;
 							d = new dir_decl(params->dirrhs);
-							d->name = malloc(sizeof(char)*4);
+							d->name = malloc(sizeof(char)*10);
+							snprintf(d->name, 10, "_flcn%d", falc_ext++);
 							// dir_decl *d = params->dirrhs;
-							strcpy(d->name, "e");
 							d->libdtype = EDGE_TYPE;
 							params->dirrhs = d;
 							ppts = d->ppts;
@@ -129,7 +138,7 @@ void convert_vertex_edge()
 
 				// foreach iterator
                 forstmt->itr = EDGES_ITYPE;
-                strcpy(forstmt->expr1->lhs->name, "e");
+                snprintf(forstmt->expr1->lhs->name, 10, "_flcn%d", falc_ext-1);
 	        	forstmt->expr3 = NULL;
 
 
@@ -235,7 +244,7 @@ void convert_vertex_edge()
 		} else if (CONVERT_VERTEX_EDGE==2 && forstmt->itr == EDGES_ITYPE) {
 			// foreach iterator
             forstmt->itr = POINT_ITYPE;
-            strcpy(forstmt->expr1->lhs->name, "p");
+            snprintf(forstmt->expr1->lhs->name, 10, "_flcn%d", falc_ext++);
         	forstmt->expr3 = NULL;
 
         	statement *function = get_function(forstmt->stassign->rhs->name);
@@ -251,9 +260,9 @@ void convert_vertex_edge()
 					if (type->libdatatype == EDGE_TYPE) {
 						type->libdatatype = POINT_TYPE;
 						point = new dir_decl(params->dirrhs);
-						point->name = malloc(sizeof(char)*4);
+						point->name = malloc(sizeof(char)*10);
 						edge = params->dirrhs;
-						strcpy(point->name, "p");
+						snprintf(point->name, 10, "_flcn%d", falc_ext++);
 						point->libdtype = EDGE_TYPE;
 						params->dirrhs = point;
 						ppts = point->ppts;
@@ -271,8 +280,8 @@ void convert_vertex_edge()
         	foreach_stmt->feb = 1;
         	foreach_stmt->itr = OUTNBRS_ITYPE;
         	dir_decl *d1 = new dir_decl();
-        	d1->name = malloc(sizeof(char)*4);
-        	strcpy(d1->name, "q");
+        	d1->name = malloc(sizeof(char)*10);
+        	snprintf(d1->name, 10, "_flcn%d", falc_ext++);
         	d1->parent = point->parent;
         	d1->libdtype = ITERATOR_TYPE;
         	d1->dtype = -1;
@@ -304,12 +313,12 @@ void convert_vertex_edge()
 
 			// create arguments
 			tree_expr *pointA = new tree_expr(point);	// first argument
-			pointA->name = malloc(sizeof(char)*4);
-			strcpy(pointA->name, "p");
+			pointA->name = malloc(sizeof(char)*10);
+			snprintf(pointA->name, 10, "_flcn%d", falc_ext-2);
 			pointA->nodetype = -1;
 			tree_expr *pointB = new tree_expr(d1);  		// second argument
 			pointB->name = malloc(sizeof(char)*4);
-			strcpy(pointB->name, "q");
+			snprintf(pointB->name, 10, "_flcn%d", falc_ext-1);
 			pointB->nodetype = -1;
 			assign_stmt *t1=createassignlhsrhs(-1,NULL,pointA);
 			assign_stmt *t2=createassignlhsrhs(-1,NULL,pointB);
