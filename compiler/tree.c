@@ -599,8 +599,11 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     else {
                         char temp[200];
                         for(int i=0; i<200; i++)temp[i]='\0';
-                        // sprintf(temp,"((%s *)(%s.extra))->%s[%s/2]",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name,expr->lhs->lhs->extra_name);
-                        sprintf(temp,"((%s *)(%s.extra))->%s",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name);
+                        if(expr->lhs->lhs->extra_name) {
+                            sprintf(temp,"((%s *)(%s.extra))->%s[%s/2]",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name,expr->lhs->lhs->extra_name);
+                        } else {
+                            sprintf(temp,"((%s *)(%s.extra))->%s",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name);
+                        }
                         strcat(print_string,temp);
                     }
                     GPSREF=0;
