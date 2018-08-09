@@ -3,6 +3,7 @@
 #include <map>
 #include <cstdlib>
 #include "falctypes.h"
+using namespace std;
 
 std::set<statement*> foreach_list;
 extern std::map<char*, statement*> fnames;
@@ -10,7 +11,9 @@ extern std::map<char*, statement*> fnamescond;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 extern int CONVERT_VERTEX_EDGE;
-int falc_ext = 0;
+int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
+std::map<dir_decl*, statement*> graph_info;
+std::map<dir_decl*, std::map<dir_decl*, statement*>*> graphs;
 
 static statement* insert_position(const char *name)
 {
@@ -35,16 +38,6 @@ static statement* get_function(const char *name) {
 			return it->second;
 		}
 	}
-	return NULL;
-}
-
-// get a name for variable such that it is not defined again in the same scope
-char* get_variable(statement *stmt)
-{
-	char buff[10];
-	buff[0] = 'f';
-	buff[1] = 'x';
-	int x = 0;
 	return NULL;
 }
 
@@ -377,5 +370,232 @@ void convert_vertex_edge()
         	end_foreach->next = rstmt;
         	rstmt->prev = end_foreach;
 		}
+	}
+}
+
+
+void convert_to_gpu()
+{
+	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
+	{
+		statement *forstmt = *ii;
+		statement *target = get_function(forstmt->stassign->rhs->name); //SBLOCK_STMT
+		tree_decl_stmt *params = target->stdecl->dirrhs->params;
+		
+		while(params) {
+			tree_typedecl *type = params->lhs;
+			while(type) {
+				// graph, point or edge
+				if (type->libdatatype >= 0 && type->libdatatype <= 2) {
+					params->dirrhs->gpu = 1;
+					break;
+				}
+				type = type->next;
+			}
+			params = params->next;
+		}		
+	}
+}
+
+void get_variables_util_exp(set<dir_decl *> &lset, set<dir_decl *> &gset, tree_expr *expr)
+{
+	if(expr->expr_type == VAR) {
+		if(expr->lhs == NULL) {
+			// printf("NULL %s\n", expr->name);
+			return;	// field of structure
+		}
+		if(lset.find(expr->lhs) == lset.end()) {
+			gset.insert(expr->lhs);
+			// printf("TEST7 %s\n", expr->lhs->name);
+		} else {
+			// printf("TEST8 %s\n", expr->lhs->name);
+		}
+	} else {
+		if(expr->lhs) {
+			get_variables_util_exp(lset, gset, expr->lhs);
+		}
+		if(expr->rhs) {
+			get_variables_util_exp(lset, gset, expr->rhs);
+		}
+		if(expr->earr_list) {
+			assign_stmt *astmt = expr->earr_list;
+			while(astmt) {
+				if(astmt->lhs) {
+					get_variables_util_exp(lset, gset, astmt->lhs);
+				}
+				if(astmt->rhs) {
+					get_variables_util_exp(lset, gset, astmt->rhs);
+				}
+				astmt = astmt->next;
+			}
+		}
+		if(expr->next) {
+			get_variables_util_exp(lset, gset, expr->next);
+		}
+		if(expr->arglist) {
+			assign_stmt *astmt = expr->arglist;
+			while(astmt) {
+				if(astmt->lhs) {
+					get_variables_util_exp(lset, gset, astmt->lhs);
+				}
+				if(astmt->rhs) {
+					get_variables_util_exp(lset, gset, astmt->rhs);
+				}
+				astmt = astmt->next;
+			}
+		}
+	}
+}
+
+void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_set, statement *begin, statement *end)
+{
+	while(begin != NULL && begin != end){
+		if(begin->sttype == DECL_STMT) {
+			dir_decl *expr = begin->stdecl->dirrhs;
+			while(expr) {
+				// printf("TEST %s\n", expr->name);
+				if(expr->rhs && expr->rhs->expr_type == VAR) {
+					if(local_set.find(expr->rhs) == local_set.end()) {
+						global_set.insert(expr->rhs);
+						// printf("TEST1 %s\n", expr->rhs->name);
+					}
+				}
+				local_set.insert(expr);
+				expr = expr->nextv;
+			}
+		} else {
+			if(begin->sttype == FOREACH_STMT) {
+				local_set.insert(begin->expr1->lhs);
+				// printf("TEST3 %s\n", begin->expr1->name);
+				if(local_set.find(begin->expr2->lhs) == local_set.end()) {
+					global_set.insert(begin->expr2->lhs);
+					// printf("TEST2 %s\n", begin->expr2->lhs->name);
+				}
+				if(begin->expr4) {
+					get_variables_util_exp(local_set, global_set, begin->expr4);
+				}
+				if(begin->stassign) {
+					assign_stmt *astmt = begin->stassign;
+					if(astmt->lhs) {
+						get_variables_util_exp(local_set, global_set, astmt->lhs);
+					}
+					if(astmt->rhs) {
+						get_variables_util_exp(local_set, global_set, astmt->rhs);
+					}
+				}
+			} else if(begin->sttype == FOR_STMT) {
+				tree_decl_stmt *stmt = begin->f1->stdecl;
+				if(stmt) {
+					dir_decl *expr = stmt->dirrhs;
+					while(expr) {
+						// printf("TEST4 %s\n", expr->name);
+						if(expr->rhs && expr->rhs->expr_type == VAR) {
+							if(local_set.find(expr->rhs) == local_set.end()) {
+								global_set.insert(expr->rhs);
+								// printf("TEST5 %s\n", expr->rhs->name);
+							}
+						}
+						local_set.insert(expr);
+						expr = expr->nextv;
+					}
+				} else {
+					assign_stmt *astmt = begin->f1->stassign;
+					if(astmt == NULL) {
+						printf("ASSIGN ERROR - EXTENSION-466\n");
+						exit(0);
+					} else {
+						if(astmt->lhs) {
+							get_variables_util_exp(local_set, global_set, astmt->lhs);
+						}
+						if(astmt->rhs) {
+							get_variables_util_exp(local_set, global_set, astmt->rhs);
+						}
+					}
+				}
+				if(begin->f2 && begin->f2->stassign) {
+					assign_stmt *astmt = begin->f2->stassign;
+					if(astmt->lhs) {
+						get_variables_util_exp(local_set, global_set, astmt->lhs);
+					}
+					if(astmt->rhs) {
+						get_variables_util_exp(local_set, global_set, astmt->rhs);
+					}
+				}
+				if(begin->f3 && begin->f3->stassign) {
+					assign_stmt *astmt = begin->f3->stassign;
+					if(astmt->lhs) {
+						get_variables_util_exp(local_set, global_set, astmt->lhs);
+					}
+					if(astmt->rhs) {
+						get_variables_util_exp(local_set, global_set, astmt->rhs);
+					}
+				}
+			} else if(begin->sttype == ASSIGN_STMT) {
+				assign_stmt *astmt = begin->stassign;
+				while(astmt) {	
+					if(astmt->lhs) {
+						get_variables_util_exp(local_set, global_set, astmt->lhs);
+					}
+					if(astmt->rhs) {
+						get_variables_util_exp(local_set, global_set, astmt->rhs);
+					}
+					astmt = astmt->next;
+				}
+			} else {
+				if(begin->expr1) {
+					get_variables_util_exp(local_set, global_set, begin->expr1);
+				}
+				if(begin->expr2) {
+					get_variables_util_exp(local_set, global_set, begin->expr2);
+				}
+				if(begin->expr3) {
+					get_variables_util_exp(local_set, global_set, begin->expr3);
+				}
+				if(begin->expr4) {
+					get_variables_util_exp(local_set, global_set, begin->expr4);
+				}
+				if(begin->expr5) {
+					get_variables_util_exp(local_set, global_set, begin->expr5);
+				}				
+				if(begin->f1) {
+					get_variables_util(local_set, global_set, begin->f1, end);
+				}
+				if(begin->f2) {
+					get_variables_util(local_set, global_set, begin->f2, end);
+				}
+				if(begin->f3) {
+					get_variables_util(local_set, global_set, begin->f3, end);
+				}
+			}
+		}
+		begin = begin->next;
+	}
+}
+
+void get_variables()
+{
+	for(map<dir_decl*, statement*>::iterator itr = graph_info.begin(); itr!=graph_info.end(); ++itr) {
+		printf("-->%s\n", itr->first->name);
+	}
+	return;
+	std::set<dir_decl *> global_set;
+	
+	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
+	{
+		std::set<dir_decl *> local_set;
+		statement *forstmt = *ii;
+		statement *target = get_function(forstmt->stassign->rhs->name);
+		tree_decl_stmt *params = target->stdecl->dirrhs->params;
+		
+		while(params) {
+			local_set.insert(params->dirrhs);
+			params = params->next;
+		}
+
+		get_variables_util(local_set, global_set, target->next->next, target->end_stmt);
+	}
+
+	for(set<dir_decl *>::iterator ii = global_set.begin(); ii != global_set.end(); ++ii) {
+		(*ii)->gpu = 1;
 	}
 }

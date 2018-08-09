@@ -73,6 +73,14 @@ int CONVERT_VERTEX_EDGE = 0;   // flag for different code generation (vertex & e
 extern std::set<statement*> foreach_list;
 extern void convert_vertex_edge();
 int level_of_foreach = 0;
+bool isGPU = false;
+extern int falc_ext;
+int ext_decl_type = -1;
+extern void convert_to_gpu();
+extern void get_variables();
+extern std::map<dir_decl*, statement*> graph_info;
+extern std::map<dir_decl*, std::map<dir_decl*, statement*>*> graphs;
+dir_decl *graph_prop;
 
 %}
 %union {
@@ -159,7 +167,7 @@ constant
       $$=binaryopnode(NULL,NULL,-1,TREE_BOOL);
     	((tree_expr *)$$)->ival=$1;
     	((tree_expr *)$$)->dtype=9;}
-	| ENUMERATION_CONSTANT{$$=$1; printf("%s\n", "test-155");}	/* after it has been defined as such */
+	| ENUMERATION_CONSTANT{$$=$1;}	/* after it has been defined as such */
 	;
 
 enumeration_constant		/* before it has been defined as such */
@@ -309,12 +317,18 @@ postfix_expression
 	    $$=$1;
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addPointProperty"))){   
         adddynamicproperty(t1,P_P_TYPE,pt1);
+        graph_prop = t1->rhs;
+        ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addEdgeProperty"))){
         adddynamicproperty(t1,E_P_TYPE,pt1);
+        graph_prop = t1->rhs;
+        ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addProperty"))){
         addgraphproperty(t1,G_P_TYPE,pt1);
+        graph_prop = t1->rhs;
+        ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"OrderByIntValue"))){
           dir_decl *d1=currsymtab->findsymbol(t1->lhs->name);
@@ -585,7 +599,12 @@ expression
   			temp1=temp3;
   			$$=new assign_stmt();
   			((assign_stmt *)$$)->rhs=$1;
-  		} else {$$=$1;}}
+  		} else {$$=$1;}
+      if(ext_decl_type == 1) {
+        graph_info[graph_prop] = temp3;
+        ext_decl_type = -1;
+      }
+    }
 	| expression ',' assignment_expression{
   		if(assflag==0){
   			temp3=createstmt(ASSIGN_STMT,NULL,NULL,LINENO);
@@ -614,6 +633,7 @@ declaration
   			temp1=temp3;
   		  temp=G1=temp1;
   		} else{ linkstmt(&temp1,temp3);}
+      ext_decl_type = -1;
 		}
 	| declaration_specifiers init_declarator_list ';'{
   		#ifdef DEBUGGING
@@ -631,13 +651,21 @@ declaration
   		} else{
         linkstmt(&temp1,temp3);
   		}
+      
+      if(ext_decl_type == 0) {
+        // graphs[$2] = 
+        graph_info[$2] = temp3;
+      }
+      ext_decl_type = -1;
   	}
 	| static_assert_declaration{
       #ifdef DEBUGGING
         printf("%s\n", "declaration-3");
       #endif
 
-      $$=new symtableentry();}
+      $$=new symtableentry();
+      ext_decl_type = -1;
+    }
 	;
 
 declaration_specifiers
@@ -687,10 +715,19 @@ init_declarator_list
 	;
 
 init_declarator
-	: declarator '=' initializer{((dir_decl *)$1)->rhs=$3;$$=$1;}
+	: declarator '=' initializer{
+      ((dir_decl *)$1)->rhs=$3;
+      $$=$1;
+      if(ext_decl_type == 0 && isGPU) {
+        ((dir_decl *)$1)->gpu = 1;
+      }
+    }
 	| declarator {
   		$$=$1;
   		((dir_decl *)$1)->rhs=NULL;
+      if(ext_decl_type == 0 && isGPU) {
+        ((dir_decl *)$1)->gpu = 1;
+      }
   	}
 	| '<' GPU devno '>'declarator'=' initializer {
   		((dir_decl *)$5)->gpu=1;
@@ -945,7 +982,10 @@ type_qualifier  /* CODE BELOW IS WRONG, use typedecl instead of dir_decl, i gues
 	;
 
 lib_type_specifier
-  : GRAPH {        $$=createlibtypedef(GRAPH_TYPE,NULL);	}
+  : GRAPH {
+      $$=createlibtypedef(GRAPH_TYPE,NULL);
+      ext_decl_type = 0;
+    }
   | EDGE %prec EDGE1 {        $$=createlibtypedef(EDGE_TYPE,NULL);	}
   | POINT %prec POINT1 {        $$=createlibtypedef(POINT_TYPE,NULL);	}
   | EDGE '(' IDENTIFIER ')'  {     $$=createlibtypedef(EDGE_TYPE,$3);	}
@@ -1240,7 +1280,12 @@ parameter_list
 	;
 
 parameter_declaration
-	: declaration_specifiers declarator{ 		$$=createdeclstmt($1,NULL,$2);	}
+	: declaration_specifiers declarator {
+      $$=createdeclstmt($1,NULL,$2);
+      if(ext_decl_type == 0 && isGPU) {
+        ((dir_decl *)$2)->gpu = 1;
+      }
+    }
 	| declaration_specifiers '<' GPU devno '>'declarator{		 $$=createdeclstmt($1,NULL,$6);
       ((dir_decl *)($6))->gpu=1;
       GPUCODEFLAG=1;
@@ -1258,7 +1303,11 @@ identifier_list
       GPUCODEFLAG=1;
 	  }
 	| IDENTIFIER{
-		  $$=createdirdecl($1,0,NULL,0,0,0,0,NULL);
+      if(ext_decl_type == 0 && isGPU) {
+        $$=createdirdecl($1,1,NULL,0,0,0,0,NULL);  
+      } else {
+		    $$=createdirdecl($1,0,NULL,0,0,0,0,NULL);
+      }
 	  }
 	| identifier_list ',' IDENTIFIER{
   		dir_decl *t1=$1; 
@@ -1664,6 +1713,7 @@ compound_begin
   			}
   			currsymtab->parent->addsymbol(FNAME,FTYPE);
   		}
+      ext_decl_type = -1;
     }
   ;
 compound_end
@@ -2116,7 +2166,7 @@ conditional_for: '('expression ')'  statement{  }
       } else {
         temp3->expr4=((assign_stmt *)$2)->rhs;
         temp3->prev=temp3->prev->prev;
-        temp3->expr4=((assign_stmt *)$2)->rhs;
+        // temp3->expr4=((assign_stmt *)$2)->rhs;
         temp3->prev->next->next=NULL;
         temp3->prev->next=temp3; 
         temp1=temp3;  
@@ -2366,7 +2416,7 @@ printlibdtypes(){
   }
 }
 
-main(int argc, char *argv[]){
+int main(int argc, char *argv[]){
   if(argc<2){
     printf("LEss number of arguments\n");
     return;
@@ -2391,6 +2441,8 @@ main(int argc, char *argv[]){
       }
       else if (!strcmp(argv[temp], "-convert")) {
         CONVERT_VERTEX_EDGE = atoi(argv[temp+1]);
+      } else if (!strcmp(argv[temp], "-gpu")) {
+        isGPU = atoi(argv[temp+1]);
       }
       temp=temp+2;
     }
@@ -2405,6 +2457,8 @@ main(int argc, char *argv[]){
 
   parserr=yyparse();
   if(parserr!=0)exit(0);
+  if(isGPU) GPUCODEFLAG = 1;
+  else GPUCODEFLAG = 0;
   if(GPUCODEFLAG==1)strcat(source,"cu");
   if(GPUCODEFLAG==0)strcat(source,"cpp");
   FP1=fopen(source,"w+");
@@ -2432,6 +2486,9 @@ main(int argc, char *argv[]){
     fprintf(FP,"#include \"../include/HSet.h\"\n");
   }
 
+  convert_to_gpu();
+  get_variables();
+
   temp->print();
   setparent();
   ERRPRINT=1;
@@ -2447,6 +2504,7 @@ main(int argc, char *argv[]){
     convert_vertex_edge();
   }
 
+
   #ifdef DEBUGGING
     printf("%s\n", "\n***********************\n****parse completed****\n***********************\n");
   #endif
@@ -2454,4 +2512,5 @@ main(int argc, char *argv[]){
   temp->codeGen1();
   for(int ii=1;ii<TOT_GPU_GRAPH;ii++)fprintf(FP,"cudaDeviceProp prop%d;\n",ii);
   printf("codegeneration done\n output files \n 1)%s\n %s\n %s \n",source,header,gheader);
+  return 0;
 }

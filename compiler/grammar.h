@@ -8,6 +8,7 @@ extern std::map<char *,int>newitr;
 extern  std::map<char *,statement *>fnames;
 extern std::map<char *,statement *>fnamescond;
 extern char *libdtypenames[];
+
 tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype) {
     tree_expr *expr=new tree_expr();
     expr->lhs=lhs;
@@ -454,7 +455,7 @@ dir_decl *createdirdeclforeach(char *name1,char *name2, int itrtype,int dtype,in
     }
     return d1;
 }
-initforstmt(statement **t1ref,tree_decl_stmt *ass1,assign_stmt *ass2,assign_stmt *ass3) {
+void initforstmt(statement **t1ref,tree_decl_stmt *ass1,assign_stmt *ass2,assign_stmt *ass3) {
     statement *t1=*t1ref;
     t1->sttype=FOR_STMT;
     if(ass1!=NULL) {
@@ -470,7 +471,7 @@ initforstmt(statement **t1ref,tree_decl_stmt *ass1,assign_stmt *ass2,assign_stmt
         t1->f3->stassign=ass3;
     }
 }
-initforstmt1(statement **t1ref,assign_stmt *ass1,assign_stmt *ass2,assign_stmt *ass3) {
+void initforstmt1(statement **t1ref,assign_stmt *ass1,assign_stmt *ass2,assign_stmt *ass3) {
     statement *t1=*t1ref;
     t1->sttype=FOR_STMT;
     if(ass1!=NULL) {

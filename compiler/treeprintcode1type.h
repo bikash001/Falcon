@@ -285,6 +285,14 @@ void printcode1graphfunction(dir_decl *d1, int off, tree_expr *expr,char *print_
                 sprintf(itemp,"%d",tempval);
                 strcat(print_string,itemp);
             }
+
+            // dir_decl *dd2=ut2->lhs;
+            // dir_decl *dd3=ut3->lhs;
+            
+            // if(dd2->parent!=NULL && dd3->parent!=NULL && dd2->parent==dd3->parent) { 
+            //     fprintf(FP1, " ****parent of %s is %s  ****\n ",dd3->name, dd3->parent->name);
+            // }
+            
             return;
         }
     }

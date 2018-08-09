@@ -1,5 +1,5 @@
 #include "externs.h"
-printcodeoutnbrs(statement *t1,dir_decl *parent, dir_decl *point, dir_decl *outnbr) {
+void printcodeoutnbrs(statement *t1,dir_decl *parent, dir_decl *point, dir_decl *outnbr) {
     int itr=4;
     dir_decl *d2=point;
     dir_decl *d1=outnbr;
@@ -41,7 +41,7 @@ printcodeoutnbrs(statement *t1,dir_decl *parent, dir_decl *point, dir_decl *outn
     unnicnt=unnicnt+3;
     utcnt=utcnt+3;
 }
-printcodeinnbrs(statement *t1/*FOREACHSTMT */, dir_decl *parent/*graph*/,dir_decl *point/*p*/,dir_decl *innbrs/*t*/) {
+void printcodeinnbrs(statement *t1/*FOREACHSTMT */, dir_decl *parent/*graph*/,dir_decl *point/*p*/,dir_decl *innbrs/*t*/) {
 //foreach(t in p.innbrs)
     dir_decl *d2p=parent;
     dir_decl *d1=innbrs;

@@ -601,7 +601,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                         for(int i=0; i<200; i++)temp[i]='\0';
                         if(expr->lhs->lhs->extra_name) {
                             sprintf(temp,"((%s *)(%s.extra))->%s[%s/2]",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name,expr->lhs->lhs->extra_name);
-                        } else {
+                        } else { // this is needed for foreach conditional stmt followed by function call
                             sprintf(temp,"((%s *)(%s.extra))->%s",expr->lhs->lhs->parent->extra_name,expr->lhs->lhs->parent->name,expr->rhs->name);
                         }
                         strcat(print_string,temp);
@@ -967,6 +967,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     if(!strcmp(name,libdtypefunctions[expr->lhs->lhs->libdtype][i])&&strlen(name)==strlen(libdtypefunctions[expr->lhs->lhs->libdtype][i])) { //to do make modular
                         flag=2;
                         if(d1->libdtype==GRAPH_TYPE) {
+                            printf("TREE.C-970\n");
                             printcode1graphfunction(d1,i,expr,print_string);
                             GPSREF=0;
                             return;
