@@ -187,12 +187,10 @@ void setparent() {
         if(t0 && t0->stdecl && t0->stdecl->dirrhs && t0->stdecl->dirrhs->procd==1) {
             dir_decl *d1=t0->stdecl->dirrhs;//function name??
         }
-
         struct funcall_list *fhead= it1->second->flist;//fhead=name of function,call expression and assignment and next pointer. Declared in tree.h
         while(fhead!=NULL) {
             if(GLOBAL_TABLE.findsymbol(fhead->name)) { //called function
                 for(std::map<char *,statement *>::reverse_iterator it2=fnames.rbegin(); it2!=fnames.rend(); it2++) { //check it is part of  forea
-
                     if( it2->first!=NULL && !(strcmp(it2->first,fhead->name))&&it2->second!=NULL) { //it2->first is also a foreach call
                         statement *t1=it2->second;//function declaration statement of function called in function it1->first
                         if(t0->ker>=1)t1->ker=2;
@@ -302,6 +300,7 @@ void setparent() {
                                 ass=ass->next;
                                 decl=decl->next;
                             }
+                            break;
                         }
                     }
                 }

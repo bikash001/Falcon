@@ -394,10 +394,12 @@ void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
 		while(arglist) {
 			if(arglist->rhs->lhs->libdtype == GRAPH_TYPE) {
 				arglist->rhs->lhs = parent_graph;
-				// arglist->rhs->name = malloc(sizeof(char)*(1+strlen(parent_graph->name)));
-				// strcpy(arglist->rhs->name, parent_graph->name);
+				arglist->rhs->name = malloc(sizeof(char)*(1+strlen(parent_graph->name)));
+				strcpy(arglist->rhs->name, parent_graph->name);
 				// arglist->rhs->name = parent_graph->name;
 				break;
+			} else if(arglist->rhs->lhs->it >= 0) {
+				arglist->rhs->lhs->parent = parent_graph;
 			}
 			arglist = arglist->next;
 		}
@@ -410,9 +412,9 @@ void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
 				// graph, point or edge
 				if (type->libdatatype >= 0 && type->libdatatype <= 2) {
 					params->dirrhs->gpu = 1;
-					if(type->libdatatype == 0) {
-						params->dirrhs->ppts = parent_graph->ppts;
-					}
+					// if(type->libdatatype == 0) {
+					// 	params->dirrhs->ppts = parent_graph->ppts;
+					// }
 					break;
 				}
 				type = type->next;
