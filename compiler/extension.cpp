@@ -6,14 +6,17 @@
 using namespace std;
 
 std::set<statement*> foreach_list;
+extern char* libdtypenames[10];
 extern std::map<char*, statement*> fnames;
 extern std::map<char*, statement*> fnamescond;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 extern int CONVERT_VERTEX_EDGE;
 int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
-std::map<dir_decl*, statement*> graph_info;
-std::map<dir_decl*, std::map<dir_decl*, statement*>*> graphs;
+std::map<dir_decl*, statement*> graph_insert_point; //store location to insert gpu graph
+
+// stores dynamic property of each graph
+std::map<dir_decl*, std::pair<statement*, std::map<dir_decl*, statement*>*>*> graphs;
 
 static statement* insert_position(const char *name)
 {
@@ -374,12 +377,31 @@ void convert_vertex_edge()
 }
 
 
-void convert_to_gpu()
+void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
 {
 	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
 	{
 		statement *forstmt = *ii;
-		statement *target = get_function(forstmt->stassign->rhs->name); //SBLOCK_STMT
+		dir_decl *parent_graph = tab.find(forstmt->expr2->lhs)->second;
+		forstmt->expr2->lhs = parent_graph;		// replace cpu graph by gpu graph
+		forstmt->expr2->name = parent_graph->name;
+
+		statement *target = get_function(forstmt->stassign->rhs->name);
+		target->ker = 1;	// set function to kernel
+
+		// change argument
+		assign_stmt *arglist = forstmt->stassign->rhs->arglist;
+		while(arglist) {
+			if(arglist->rhs->lhs->libdtype == GRAPH_TYPE) {
+				arglist->rhs->lhs = parent_graph;
+				// arglist->rhs->name = malloc(sizeof(char)*(1+strlen(parent_graph->name)));
+				// strcpy(arglist->rhs->name, parent_graph->name);
+				// arglist->rhs->name = parent_graph->name;
+				break;
+			}
+			arglist = arglist->next;
+		}
+
 		tree_decl_stmt *params = target->stdecl->dirrhs->params;
 		
 		while(params) {
@@ -388,6 +410,9 @@ void convert_to_gpu()
 				// graph, point or edge
 				if (type->libdatatype >= 0 && type->libdatatype <= 2) {
 					params->dirrhs->gpu = 1;
+					if(type->libdatatype == 0) {
+						params->dirrhs->ppts = parent_graph->ppts;
+					}
 					break;
 				}
 				type = type->next;
@@ -572,12 +597,131 @@ void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_set,
 	}
 }
 
+void insert_statement(statement *lhs, statement *stmt, statement *rhs)
+{
+	lhs->next = stmt;
+	stmt->prev = lhs;
+	stmt->next = rhs;
+	rhs->prev = stmt;
+}
+
+statement* create_decl_statement(LIBDATATYPE type)
+{
+	// type declaration
+	tree_typedecl *ptr = new tree_typedecl();
+    ptr->libdatatype = type;
+    ptr->name=malloc(sizeof(char )*10);
+    strcpy(ptr->name, libdtypenames[type]);
+	
+	// declarator
+	dir_decl *d = new dir_decl();
+	d->name = malloc(sizeof(char)*10);
+	snprintf(d->name, 10, "_flcn%d", falc_ext++);
+	d->read = 1;
+	d->libdtype = type;
+	d->gpu = 1;
+
+	tree_decl_stmt *tstmt = new tree_decl_stmt();
+	tstmt->lhs=ptr;
+	tstmt->dirrhs=d;
+	statement *stmt=new statement();
+	stmt->sttype=DECL_STMT;
+	stmt->stdecl = tstmt;
+
+	return stmt;
+}
+
+void copy_graph_properties(dir_decl *dg, dir_decl *new_graph)
+{
+	if(dg->ppts!=NULL){
+      extra_ppts *newppts,*oldppts=dg->ppts,*head;
+      newppts=malloc(sizeof(struct extra_ppts));
+      newppts->parent=NULL;
+      newppts->name=malloc(sizeof(char)*100);
+      strncpy(newppts->name,oldppts->name,strlen(oldppts->name));
+      newppts->libdtype=oldppts->libdtype;
+      newppts->t1=oldppts->t1;//mutliple entries point to same type
+      newppts->var2=oldppts->var2;
+      newppts->var1=oldppts->var1;
+      newppts->var3=oldppts->var3;
+      newppts->val2=oldppts->val2;
+      newppts->next=NULL;
+	  newppts->parent=dg;
+      head=newppts;
+      oldppts=oldppts->next;
+      while(oldppts){
+        newppts->next=malloc(sizeof(struct extra_ppts));
+        newppts=newppts->next;
+        newppts->parent=NULL;
+        newppts->name=malloc(sizeof(char)*100);
+        strcpy(newppts->name,oldppts->name);
+        newppts->libdtype=oldppts->libdtype;
+        newppts->t1=oldppts->t1;
+        newppts->var2=new dir_decl();
+        newppts->val2=oldppts->val2;
+        newppts->var2->name=malloc(sizeof(char)*100);
+        if(oldppts->var2!=NULL)strncpy(newppts->var2->name,oldppts->var2->name,strlen(oldppts->var2->name));
+        newppts->next=NULL;
+        oldppts=oldppts->next;
+      }
+      new_graph->ppts=head;
+    }
+    
+}
+
+statement* create_assign_statement(dir_decl *lhs, dir_decl *rhs)
+{
+	// copy graph properties
+	copy_graph_properties(rhs, lhs);
+
+	assign_stmt *ptr=new assign_stmt();
+    ptr->asstype = AASSIGN;
+    tree_expr *exp_lhs = new tree_expr(lhs);
+    exp_lhs->name = malloc(sizeof(char)*(1+strlen(lhs->name)));
+   	strcpy(exp_lhs->name, lhs->name);
+    exp_lhs->kernel = 5;
+    tree_expr *exp_rhs = new tree_expr(rhs);
+    exp_rhs->name = malloc(sizeof(char)*(1+strlen(rhs->name)));
+   	strcpy(exp_rhs->name, rhs->name);
+    exp_rhs->kernel = 5;
+    ptr->lhs = exp_lhs;
+    ptr->rhs = exp_rhs;
+
+    statement *stmt=new statement();
+    stmt->sttype= ASSIGN_STMT;
+    stmt->stassign = ptr;
+    return stmt;
+}
+
+void insert_graph_node()
+{
+	map<dir_decl*, dir_decl*> tab;
+	for(map<dir_decl*, statement*>::iterator itr=graph_insert_point.begin(); itr!=graph_insert_point.end(); itr++) {
+		statement *begin = itr->second->prev;
+		statement *end = itr->second;
+		
+		statement *stmt = create_decl_statement(GRAPH_TYPE);
+		insert_statement(begin, stmt, end);
+	
+		tab[itr->first] = stmt->stdecl->dirrhs;
+		
+		stmt = create_assign_statement(stmt->stdecl->dirrhs, itr->first);
+		insert_statement(end, stmt, end->next);
+	}
+	convert_to_gpu(tab);
+}
+
 void get_variables()
 {
-	for(map<dir_decl*, statement*>::iterator itr = graph_info.begin(); itr!=graph_info.end(); ++itr) {
-		printf("-->%s\n", itr->first->name);
-	}
-	return;
+	// for(map<dir_decl*, pair<statement*, map<dir_decl*, statement*>*>*>::iterator ii = graphs.begin(); ii != graphs.end(); ++ii) {
+	// 	map<dir_decl*, statement*> *graph = ii->second->second;
+	// 	printf("GRAPH %s\n", ii->first->name);
+	// 	for(map<dir_decl*, statement*>::iterator itr = graph->begin(); itr!=graph->end(); ++itr) {
+	// 		printf("-->%s\n", itr->first->name);
+	// 	}
+	// }
+	// return;
+
 	std::set<dir_decl *> global_set;
 	
 	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)

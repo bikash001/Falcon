@@ -1880,7 +1880,7 @@ void statement::codeGen(FILE *FP1) {
                         if(CURR_STMT && Gkernel==0) {
                             char initarr[100];
                             for(int i=0; i<100; i++)initarr[0]='\0';
-//dir_decl *t1=this->stdecl->dirrhs;
+                            //dir_decl *t1=this->stdecl->dirrhs;
                             fprintf(FP1,"struct dev_vec ");
                             while(t1!=NULL) {
                                 if(cnt>0)fprintf(FP1,",");
@@ -1907,13 +1907,13 @@ void statement::codeGen(FILE *FP1) {
                                 t1=t1->nextv;
                             }
 
-//fprintf(FP1,"struct host_vec %s;",t1->name);
-//if(t1!=NULL && t1->parent!=NULL){
-//t1->extra_name1=malloc(sizeof(char)*100);strcpy(t1->extra_name1,t1->name);
-//t1->extra_name=malloc(sizeof(char)*100);strcpy(t1->extra_name,t1->parent->extra_name);
-//}
-//t1=this->stdecl->dirrhs;
-//fprintf(FP1,"%s= create_coll_device(100);\n",t1->name);t1->local=true;
+                            //fprintf(FP1,"struct host_vec %s;",t1->name);
+                            //if(t1!=NULL && t1->parent!=NULL){
+                            //t1->extra_name1=malloc(sizeof(char)*100);strcpy(t1->extra_name1,t1->name);
+                            //t1->extra_name=malloc(sizeof(char)*100);strcpy(t1->extra_name,t1->parent->extra_name);
+                            //}
+                            //t1=this->stdecl->dirrhs;
+                            //fprintf(FP1,"%s= create_coll_device(100);\n",t1->name);t1->local=true;
 
                         }
                         if(Gkernel==0 && CURR_STMT==NULL)  {

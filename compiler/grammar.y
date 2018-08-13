@@ -76,11 +76,14 @@ int level_of_foreach = 0;
 bool isGPU = false;
 extern int falc_ext;
 int ext_decl_type = -1;
-extern void convert_to_gpu();
+// extern void convert_to_gpu();
 extern void get_variables();
-extern std::map<dir_decl*, statement*> graph_info;
-extern std::map<dir_decl*, std::map<dir_decl*, statement*>*> graphs;
-dir_decl *graph_prop;
+// extern std::map<dir_decl*, statement*> graph_info;
+extern std::map<dir_decl*, std::pair<statement*, std::map<dir_decl*, statement*>*>* > graphs;
+dir_decl *graph_prop = NULL, *parent_graph = NULL;
+extern std::map<dir_decl*, statement*> graph_insert_point;
+dir_decl *insert_point = NULL;
+extern void insert_graph_node();
 
 %}
 %union {
@@ -270,6 +273,13 @@ postfix_expression
         else funtemp->next=NULL;
         fhead=funtemp;
 		  } else {
+        // keep track of point where gpu graph should be inserted
+        if(isGPU && t1->expr_type == STRUCTREF) {
+          if(t1->lhs->lhs->libdtype == GRAPH_TYPE && strcmp(t1->rhs->name, "read") == 0) {
+            insert_point = t1->lhs->lhs;
+            // printf("TEST %s\n", insert_point->name);
+          }
+        }
         t1=((tree_expr *)$1)->rhs;
         t1=funcallpostfix(t1,FUNCALL,KERNEL,$3);
       }
@@ -318,16 +328,19 @@ postfix_expression
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addPointProperty"))){   
         adddynamicproperty(t1,P_P_TYPE,pt1);
         graph_prop = t1->rhs;
+        parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addEdgeProperty"))){
         adddynamicproperty(t1,E_P_TYPE,pt1);
         graph_prop = t1->rhs;
+        parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addProperty"))){
         addgraphproperty(t1,G_P_TYPE,pt1);
         graph_prop = t1->rhs;
+        parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"OrderByIntValue"))){
@@ -421,7 +434,8 @@ postfix_expression
 	;
 
 paraargument_expression_list: argument_expression_list{
-	    $$=$1;arglistflag=1;}
+	    $$=$1;
+      arglistflag=1;}
   | parameter_type_list {
 	    $$=$1;}
   ;
@@ -600,9 +614,19 @@ expression
   			$$=new assign_stmt();
   			((assign_stmt *)$$)->rhs=$1;
   		} else {$$=$1;}
+      // keep track of added property of graph
       if(ext_decl_type == 1) {
-        graph_info[graph_prop] = temp3;
+        std::map<dir_decl*, statement*> *map = graphs.find(parent_graph)->second->second;
+        (*map)[graph_prop] = temp3;
         ext_decl_type = -1;
+        graph_insert_point[parent_graph] = temp3; // keep track of insertion point for gpu graph
+      }
+      // keep track of insertion point for gpu graph
+      // just before graph read function
+      else if(insert_point) {
+        // printf("TEST-2\n");
+        graph_insert_point[insert_point] = temp3;
+        insert_point = NULL;
       }
     }
 	| expression ',' assignment_expression{
@@ -653,8 +677,10 @@ declaration
   		}
       
       if(ext_decl_type == 0) {
-        // graphs[$2] = 
-        graph_info[$2] = temp3;
+        std::map<dir_decl*, statement*> *map = new std::map<dir_decl*, statement*>();
+        std::pair<statement*, std::map<dir_decl*, statement*>*> *pair = new std::pair<statement*, std::map<dir_decl*, statement*>*>(temp3, map);
+        graphs[$2] = pair;
+         // graph_info[$2] = temp3;
       }
       ext_decl_type = -1;
   	}
@@ -718,16 +744,16 @@ init_declarator
 	: declarator '=' initializer{
       ((dir_decl *)$1)->rhs=$3;
       $$=$1;
-      if(ext_decl_type == 0 && isGPU) {
-        ((dir_decl *)$1)->gpu = 1;
-      }
+      // if(ext_decl_type == 0 && isGPU) {
+      //   ((dir_decl *)$1)->gpu = 1;
+      // }
     }
 	| declarator {
   		$$=$1;
   		((dir_decl *)$1)->rhs=NULL;
-      if(ext_decl_type == 0 && isGPU) {
-        ((dir_decl *)$1)->gpu = 1;
-      }
+      // if(ext_decl_type == 0 && isGPU) {
+      //   ((dir_decl *)$1)->gpu = 1;
+      // }
   	}
 	| '<' GPU devno '>'declarator'=' initializer {
   		((dir_decl *)$5)->gpu=1;
@@ -1282,9 +1308,9 @@ parameter_list
 parameter_declaration
 	: declaration_specifiers declarator {
       $$=createdeclstmt($1,NULL,$2);
-      if(ext_decl_type == 0 && isGPU) {
-        ((dir_decl *)$2)->gpu = 1;
-      }
+      // if(ext_decl_type == 0 && isGPU) {
+      //   ((dir_decl *)$2)->gpu = 1;
+      // }
     }
 	| declaration_specifiers '<' GPU devno '>'declarator{		 $$=createdeclstmt($1,NULL,$6);
       ((dir_decl *)($6))->gpu=1;
@@ -1303,11 +1329,11 @@ identifier_list
       GPUCODEFLAG=1;
 	  }
 	| IDENTIFIER{
-      if(ext_decl_type == 0 && isGPU) {
-        $$=createdirdecl($1,1,NULL,0,0,0,0,NULL);  
-      } else {
+      // if(ext_decl_type == 0 && isGPU) {
+      //   $$=createdirdecl($1,1,NULL,0,0,0,0,NULL);  
+      // } else {
 		    $$=createdirdecl($1,0,NULL,0,0,0,0,NULL);
-      }
+      // }
 	  }
 	| identifier_list ',' IDENTIFIER{
   		dir_decl *t1=$1; 
@@ -2486,8 +2512,11 @@ int main(int argc, char *argv[]){
     fprintf(FP,"#include \"../include/HSet.h\"\n");
   }
 
-  convert_to_gpu();
-  get_variables();
+  if(isGPU) {
+    insert_graph_node(); // insert GPU graph node;
+    // convert_to_gpu(); // converts parameter of kernels to GPU variable type
+    get_variables();  // converts global variables
+  }
 
   temp->print();
   setparent();

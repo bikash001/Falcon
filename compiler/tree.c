@@ -967,7 +967,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     if(!strcmp(name,libdtypefunctions[expr->lhs->lhs->libdtype][i])&&strlen(name)==strlen(libdtypefunctions[expr->lhs->lhs->libdtype][i])) { //to do make modular
                         flag=2;
                         if(d1->libdtype==GRAPH_TYPE) {
-                            printf("TREE.C-970\n");
+                            // printf("TREE.C-970\n");
                             printcode1graphfunction(d1,i,expr,print_string);
                             GPSREF=0;
                             return;
