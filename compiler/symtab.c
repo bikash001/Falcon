@@ -211,7 +211,7 @@ void setparent() {
                             if(expr->arglist!=NULL)ass=expr->arglist;//arguments of call
                             dir_decl *itr=NULL;
                             while(ass&& ass->next&&decl&&decl->next) {
-                                if(ass->rhs->lhs && ((dir_decl *)(ass->rhs->lhs))&& ((dir_decl *)(ass->rhs->lhs))->it>=0) {
+                                if(((dir_decl *)(ass->rhs->lhs))&& ((dir_decl *)(ass->rhs->lhs))->it>=0) {
 //fprintf(stderr,"%s %s \n", it1->second->stdecl->dirrhs->name,fhead->name);
                                     it=((dir_decl *)(ass->rhs->lhs))->it;//iterator of varable
                                     if(((dir_decl *)(ass->rhs->lhs))->parent && ((dir_decl *)(ass->rhs->lhs))->parent->tp1 && ((dir_decl *)(ass->rhs->lhs))->parent->tp1->d1) {

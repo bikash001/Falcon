@@ -1252,7 +1252,6 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                         else if((i==1) /*&& expr->rhs->expr_type==ARRREF*/)expr->libdtype=POINT_TYPE;
                         else if((i==2)||(i==3))expr->libdtype=-2;
                     }
-
                 }
                 if(expr->lhs && expr->lhs->parent!=NULL) {
                     extra_ppts *ex=expr->lhs->parent->ppts;

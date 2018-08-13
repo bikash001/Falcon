@@ -14,6 +14,7 @@ extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_ex
 extern int CONVERT_VERTEX_EDGE;
 int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
 std::map<dir_decl*, statement*> graph_insert_point; //store location to insert gpu graph
+extern tree_expr *temp_stmt_add;
 
 // stores dynamic property of each graph
 std::map<dir_decl*, std::pair<statement*, std::map<dir_decl*, statement*>*>*> graphs;
@@ -482,8 +483,8 @@ void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_set,
 			while(expr) {
 				// printf("TEST %s\n", expr->name);
 				if(expr->rhs && expr->rhs->expr_type == VAR) {
-					if(local_set.find(expr->rhs) == local_set.end()) {
-						global_set.insert(expr->rhs);
+					if(local_set.find(expr->rhs->lhs) == local_set.end()) {
+						global_set.insert(expr->rhs->lhs);
 						// printf("TEST1 %s\n", expr->rhs->name);
 					}
 				}
@@ -599,6 +600,117 @@ void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_set,
 	}
 }
 
+void walk_exp(dir_decl* old_decl, dir_decl* new_decl, tree_expr *expr)
+{
+	if(expr == NULL) {
+		return;
+	}
+	if(expr->expr_type == VAR) {
+		if(expr->lhs == old_decl) {
+			// printf("TESTING %s %s\n", expr->lhs->name, expr->rhs->name);
+			expr->lhs = new_decl;
+			expr->name = malloc(sizeof(char)*(1+strlen(new_decl->name)));
+			strcpy(expr->name, new_decl->name);
+			// expr->name = new_decl->name;
+			return;
+		}
+	} else {
+		if(expr->lhs) {
+			walk_exp(old_decl, new_decl, expr->lhs);
+		}
+		if(expr->rhs) {
+			walk_exp(old_decl, new_decl, expr->rhs);
+		}
+		if(expr->earr_list) {
+			assign_stmt *astmt = expr->earr_list;
+			while(astmt) {
+				if(astmt->lhs) {
+					walk_exp(old_decl, new_decl, astmt->lhs);
+				}
+				if(astmt->rhs) {
+					walk_exp(old_decl, new_decl, astmt->rhs);
+				}
+				astmt = astmt->next;
+			}
+		}
+		if(expr->next) {
+			walk_exp(old_decl, new_decl, expr->next);
+		}
+		if(expr->arglist) {
+			assign_stmt *astmt = expr->arglist;
+			while(astmt) {
+				if(astmt->lhs) {
+					walk_exp(old_decl, new_decl, astmt->lhs);
+				}
+				if(astmt->rhs) {
+					walk_exp(old_decl, new_decl, astmt->rhs);
+				}
+				astmt = astmt->next;
+			}
+		}
+	}
+}
+
+void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *begin)
+{
+	if(begin == NULL) return;
+	statement *end = begin->end_stmt;
+	while(begin && begin != end && begin->sttype != FUNCTION_EBLOCK_STMT && begin->lineno != 49){
+		if(begin->sttype == DECL_STMT) {
+			// dir_decl *expr = begin->stdecl->dirrhs;
+			// walk_exp(old_decl, new_decl, expr);
+			dir_decl *expr = begin->stdecl->dirrhs;
+			while(expr) {
+				if(expr->rhs && expr->rhs->expr_type == VAR) {
+					if(expr->rhs->lhs == old_decl) {
+						expr->rhs->lhs = new_decl;
+					}
+				}
+				expr = expr->nextv;
+			}
+		} else if(begin->sttype == ASSIGN_STMT) {
+			assign_stmt *astmt = begin->stassign;
+			while(astmt) {	
+				if(astmt->lhs) {
+					walk_exp(old_decl, new_decl, astmt->lhs);
+				}
+				if(astmt->rhs) {
+					walk_exp(old_decl, new_decl, astmt->rhs);
+				}
+				astmt = astmt->next;
+			}
+		} else if(begin->sttype != FOREACH_STMT) {
+			if(begin->expr1) {
+				walk_exp(old_decl, new_decl, begin->expr1);
+			}
+			if(begin->expr2) {
+				walk_exp(old_decl, new_decl, begin->expr2);
+			}
+			if(begin->expr3) {
+				walk_exp(old_decl, new_decl, begin->expr3);
+			}
+			if(begin->expr4) {
+				walk_exp(old_decl, new_decl, begin->expr4);
+			}
+			if(begin->expr5) {
+				walk_exp(old_decl, new_decl, begin->expr5);
+			}				
+			if(begin->f1) {
+				walk_statement(old_decl, new_decl, begin->f1);
+			}
+			if(begin->f2) {
+				walk_statement(old_decl, new_decl, begin->f2);
+			}
+			if(begin->f3) {
+				walk_statement(old_decl, new_decl, begin->f3);
+			}
+		}
+		
+		begin = begin->next;
+	}
+}
+
+
 void insert_statement(statement *lhs, statement *stmt, statement *rhs)
 {
 	lhs->next = stmt;
@@ -695,22 +807,36 @@ statement* create_assign_statement(dir_decl *lhs, dir_decl *rhs)
     return stmt;
 }
 
+void replace_graphs(map<dir_decl*, dir_decl*> &tab)
+{
+	for(map<dir_decl*, dir_decl*>::iterator itr=tab.begin(); itr!=tab.end(); ++itr) {
+		statement *start = graph_insert_point.find(itr->first)->second->next->next->next;
+
+		walk_statement(itr->first, itr->second, start);
+		// if(temp_stmt_add != NULL) {
+		// 	printf("NOT NULL\n");
+		// 	temp_stmt_add->lhs->lhs = itr->second;
+		// }
+	}
+}
+
 void insert_graph_node()
 {
 	map<dir_decl*, dir_decl*> tab;
 	for(map<dir_decl*, statement*>::iterator itr=graph_insert_point.begin(); itr!=graph_insert_point.end(); itr++) {
-		statement *begin = itr->second->prev;
-		statement *end = itr->second;
-		
+		statement *begin = itr->second;
+		statement *end = itr->second->next;
 		statement *stmt = create_decl_statement(GRAPH_TYPE);
 		insert_statement(begin, stmt, end);
 	
 		tab[itr->first] = stmt->stdecl->dirrhs;
-		
+		stmt->stdecl->dirrhs->libstable = itr->first->libstable;
+
 		stmt = create_assign_statement(stmt->stdecl->dirrhs, itr->first);
-		insert_statement(end, stmt, end->next);
+		insert_statement(end->prev, stmt, end);
 	}
 	convert_to_gpu(tab);
+	replace_graphs(tab);
 }
 
 void get_variables()
