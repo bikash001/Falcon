@@ -362,7 +362,6 @@ postfix_expression
       ((tree_expr *)((tree_expr *)$$)->rhs)->expr_type=VAR;
       ((tree_expr *)$$)->kernel=KERNEL;
       ((tree_expr *)($1))->nodetype=-10;
-      temp_stmt_add = $$;
     }
 	| postfix_expression INC_OP{$$= binaryopnode($1,NULL,POSTINC,-1);}
   | postfix_expression'.'GETTYPE'('')'  identifier_list %prec GETTYPE1 { 

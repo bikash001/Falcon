@@ -19,6 +19,8 @@ extern tree_expr *temp_stmt_add;
 // stores dynamic property of each graph
 std::map<dir_decl*, std::pair<statement*, std::map<dir_decl*, statement*>*>*> graphs;
 
+// Returns the pointer to SBLOCK_STMT of function.
+// Used to insert new statements at the beginning of a function in case of verted-edge conversion.
 static statement* insert_position(const char *name)
 {
 	for(std::map<char*, statement*>::iterator it = fnames.begin(); it!=fnames.end(); it++)
@@ -36,6 +38,7 @@ static statement* insert_position(const char *name)
 	return NULL;
 }
 
+// Returns the statement which defines a function.
 static statement* get_function(const char *name) {
 	for(std::map<char*, statement*>::iterator it = fnames.begin(); it!=fnames.end(); it++) {
 		if (strcmp(name, it->first) == 0) {
@@ -45,6 +48,8 @@ static statement* get_function(const char *name) {
 	return NULL;
 }
 
+// Replaces graph functions like getedge and getweight by edge and 
+// its field in conversion of vertex based to edge based.
 void replace_functions(statement *begin, statement *end, dir_decl *p, dir_decl *q, dir_decl *edge)
 {
 	// printf("TEST %p %p\n", begin, begin->end_stmt);
@@ -89,6 +94,7 @@ void replace_functions(statement *begin, statement *end, dir_decl *p, dir_decl *
 	}
 }
 
+// Converts vertex to edge based and vice-versa
 void convert_vertex_edge()
 {
 	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
@@ -377,7 +383,8 @@ void convert_vertex_edge()
 	}
 }
 
-
+// Replaces cpu graphs by gpu graphs in foreach-statement and converts function 
+// parameters to gpu type.
 void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
 {
 	for(std::set<statement*>::iterator ii = foreach_list.begin(); ii != foreach_list.end(); ++ii)
@@ -425,6 +432,7 @@ void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
 	}
 }
 
+// Finds local and global variables used in an expression
 void get_variables_util_exp(set<dir_decl *> &lset, set<dir_decl *> &gset, tree_expr *expr)
 {
 	if(expr->expr_type == VAR) {
@@ -475,6 +483,7 @@ void get_variables_util_exp(set<dir_decl *> &lset, set<dir_decl *> &gset, tree_e
 	}
 }
 
+// Utility function to find global and local variables.
 void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_set, statement *begin, statement *end)
 {
 	while(begin != NULL && begin != end){
@@ -600,12 +609,17 @@ void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_set,
 	}
 }
 
+int log = 0;
+// Walks through expression and replaces old_decl by new_decl.
 void walk_exp(dir_decl* old_decl, dir_decl* new_decl, tree_expr *expr)
 {
 	if(expr == NULL) {
 		return;
 	}
 	if(expr->expr_type == VAR) {
+		if(log) {
+			printf("LOG %s\n", expr->name);
+		}
 		if(expr->lhs == old_decl) {
 			// printf("TESTING %s %s\n", expr->lhs->name, expr->rhs->name);
 			expr->lhs = new_decl;
@@ -651,34 +665,49 @@ void walk_exp(dir_decl* old_decl, dir_decl* new_decl, tree_expr *expr)
 	}
 }
 
+void walk_util(dir_decl *old_decl, dir_decl *new_decl, statement *stmt)
+{
+	assign_stmt *astmt = stmt->stassign;
+	while(astmt) {	
+		if(astmt->lhs) {
+			walk_exp(old_decl, new_decl, astmt->lhs);
+		}
+		if(astmt->rhs) {
+			walk_exp(old_decl, new_decl, astmt->rhs);
+		}
+		astmt = astmt->next;
+	}
+}
+
+// Utility function to walk through statements and call wal_exp() to replace old variables with new
 void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *begin)
 {
-	if(begin == NULL) return;
-	statement *end = begin->end_stmt;
-	while(begin && begin != end && begin->sttype != FUNCTION_EBLOCK_STMT && begin->lineno != 49){
+	while(begin && begin->sttype != FUNCTION_EBLOCK_STMT){
 		if(begin->sttype == DECL_STMT) {
-			// dir_decl *expr = begin->stdecl->dirrhs;
-			// walk_exp(old_decl, new_decl, expr);
 			dir_decl *expr = begin->stdecl->dirrhs;
 			while(expr) {
-				if(expr->rhs && expr->rhs->expr_type == VAR) {
-					if(expr->rhs->lhs == old_decl) {
-						expr->rhs->lhs = new_decl;
+				// if(expr->rhs && expr->rhs->expr_type == VAR) {
+				// 	if(expr->rhs->lhs == old_decl) {
+				// 		expr->rhs->lhs = new_decl;
+				// 	}
+				// }
+				if(expr->rhs) {
+					if(expr->rhs->expr_type == VAR) {
+						if(expr->rhs->lhs == old_decl) {
+							expr->rhs->lhs = new_decl;
+						}	
+					} else {
+						walk_exp(old_decl, new_decl, expr->rhs);
 					}
 				}
 				expr = expr->nextv;
 			}
+		} else if(begin->sttype == FOR_STMT) {
+			if(begin->f1) walk_util(old_decl, new_decl, begin->f1);
+			if(begin->f2) walk_util(old_decl, new_decl, begin->f2);
+			if(begin->f3) walk_util(old_decl, new_decl, begin->f3);
 		} else if(begin->sttype == ASSIGN_STMT) {
-			assign_stmt *astmt = begin->stassign;
-			while(astmt) {	
-				if(astmt->lhs) {
-					walk_exp(old_decl, new_decl, astmt->lhs);
-				}
-				if(astmt->rhs) {
-					walk_exp(old_decl, new_decl, astmt->rhs);
-				}
-				astmt = astmt->next;
-			}
+			walk_util(old_decl, new_decl, begin);
 		} else if(begin->sttype != FOREACH_STMT) {
 			if(begin->expr1) {
 				walk_exp(old_decl, new_decl, begin->expr1);
@@ -710,7 +739,7 @@ void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *begin)
 	}
 }
 
-
+// Inserts a statement stmt in between lhs and rhs
 void insert_statement(statement *lhs, statement *stmt, statement *rhs)
 {
 	lhs->next = stmt;
@@ -719,6 +748,7 @@ void insert_statement(statement *lhs, statement *stmt, statement *rhs)
 	rhs->prev = stmt;
 }
 
+// Creates a declaration statement.
 statement* create_decl_statement(LIBDATATYPE type)
 {
 	// type declaration
@@ -745,6 +775,7 @@ statement* create_decl_statement(LIBDATATYPE type)
 	return stmt;
 }
 
+// Copies graph properties from one graph to another
 void copy_graph_properties(dir_decl *dg, dir_decl *new_graph)
 {
 	if(dg->ppts!=NULL){
@@ -783,6 +814,7 @@ void copy_graph_properties(dir_decl *dg, dir_decl *new_graph)
     
 }
 
+// Creates assignment statement
 statement* create_assign_statement(dir_decl *lhs, dir_decl *rhs)
 {
 	// copy graph properties
@@ -807,19 +839,17 @@ statement* create_assign_statement(dir_decl *lhs, dir_decl *rhs)
     return stmt;
 }
 
+// Replaces cpu graph by gpu graph
 void replace_graphs(map<dir_decl*, dir_decl*> &tab)
 {
 	for(map<dir_decl*, dir_decl*>::iterator itr=tab.begin(); itr!=tab.end(); ++itr) {
 		statement *start = graph_insert_point.find(itr->first)->second->next->next->next;
 
 		walk_statement(itr->first, itr->second, start);
-		// if(temp_stmt_add != NULL) {
-		// 	printf("NOT NULL\n");
-		// 	temp_stmt_add->lhs->lhs = itr->second;
-		// }
 	}
 }
 
+// Inserts a new graph node
 void insert_graph_node()
 {
 	map<dir_decl*, dir_decl*> tab;
@@ -839,6 +869,7 @@ void insert_graph_node()
 	replace_graphs(tab);
 }
 
+// Finds global variables using in kernel
 void get_variables()
 {
 	// for(map<dir_decl*, pair<statement*, map<dir_decl*, statement*>*>*>::iterator ii = graphs.begin(); ii != graphs.end(); ++ii) {
