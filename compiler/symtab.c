@@ -30,7 +30,7 @@ char *pdim_string[4]= {"","","2*","3*"};
 char *morphalloc_string[3]= {"","*3","*8"};
 
 char *cpy[]= {"if(","!=cudaSuccess) {\n\tprintf(\"memcpyerror ","\");\n\texit(1);\n}"};
-alloc_extra_fun(dir_decl *t1) {
+void alloc_extra_fun(dir_decl *t1) {
     int indent=4;
     if (t1->ppts!=NULL) {
         if(t1->gpu==0) {
@@ -533,7 +533,7 @@ realloc_graph(statement *st ) {
 }
 
 
-alloc_extra(statement *st ) {
+void alloc_extra(statement *st ) {
     int gpf=0;
     fp1=FPG;
     tree_typedecl *x1=st->stdecl->lhs;

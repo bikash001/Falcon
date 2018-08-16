@@ -2484,8 +2484,10 @@ int main(int argc, char *argv[]){
 
   parserr=yyparse();
   if(parserr!=0)exit(0);
-  if(isGPU) GPUCODEFLAG = 1;
-  else GPUCODEFLAG = 0;
+  if(isGPU){
+    GPUCODEFLAG = 1;
+    TOT_GPU_GRAPH++;
+  } else GPUCODEFLAG = 0;
   if(GPUCODEFLAG==1)strcat(source,"cu");
   if(GPUCODEFLAG==0)strcat(source,"cpp");
   FP1=fopen(source,"w+");
