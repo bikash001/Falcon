@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<math.h>
-#include <symtabold.h>
+#include "symtabold.h"
 #include "externs.h"
 
 #include "falctypes.h"
@@ -349,9 +349,13 @@ void statement::codeGen(FILE *FP1) {
     if(this->sttype==EMPTY_STMT) {
         // insert condition of foreach conditional statement for vertex based
         if(this->end_stmt) {
-            if(vb_forcondarr[0]!='\0') {
+            if(this->lineno == 1 && vb_forcondarr[0]!='\0') {
                 fprintf(FP1, "\n if( %s ){",vb_forcondarr);
                 free(vb_forcondarr);
+            }
+        } else if(this->lineno == 2) {
+            if(this->name) {
+                fprintf(FP1, "%s", this->name);
             }
         } else {
             fprintf(FP1,";");
@@ -1979,7 +1983,6 @@ void statement::codeGen(FILE *FP1) {
             this->stdecl->printcode(1);
         }
         if(x1->libdatatype==-1) {
-
             while(x1  && (x1->datatype==-1 || x1->datatype==TYPEDEF_TYPE)) {
                 fprintf(FP1,"%s",x1->name);
                 x1=x1->next;
@@ -2055,7 +2058,7 @@ void statement::codeGen(FILE *FP1) {
                             }
                             t1=t1->nextv;
                         }
-                        fprintf(FP1,";\n");
+                        // fprintf(FP1,";\n");
                     }
                     if(hf==1) {
                         fprintf(FP1," ");

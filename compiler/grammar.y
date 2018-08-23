@@ -84,7 +84,7 @@ dir_decl *graph_prop = NULL, *parent_graph = NULL;
 extern std::map<dir_decl*, statement*> graph_insert_point;
 dir_decl *insert_point = NULL;
 extern void insert_graph_node();
-tree_expr *temp_stmt_add;
+extern std::map<dir_decl*, statement*> fx_sets, fx_collections;
 
 %}
 %union {
@@ -562,7 +562,7 @@ assignment_expression
   		$$=$1;
   		assflag=0;
     }
-	|  unary_expression assignment_operator assignment_expression{
+	| unary_expression assignment_operator assignment_expression{
   		((assign_stmt *)$2)->lhs=(tree_expr *)$1;
   		((tree_expr *)$1)->kernel=5;
   		((tree_expr *)$3)->kernel=5;
@@ -616,18 +616,20 @@ expression
   			((assign_stmt *)$$)->rhs=$1;
   		} else {$$=$1;}
       // keep track of added property of graph
-      if(ext_decl_type == 1) {
-        std::map<dir_decl*, statement*> *map = graphs.find(parent_graph)->second->second;
-        (*map)[graph_prop] = temp3;
-        ext_decl_type = -1;
-        graph_insert_point[parent_graph] = temp3; // keep track of insertion point for gpu graph
-      }
-      // keep track of insertion point for gpu graph
-      // just before graph read function
-      else if(insert_point) {
-        // printf("TEST-2\n");
-        graph_insert_point[insert_point] = temp3;
-        insert_point = NULL;
+      if(isGPU) {
+        if(ext_decl_type == 1) {
+          std::map<dir_decl*, statement*> *map = graphs.find(parent_graph)->second->second;
+          (*map)[graph_prop] = temp3;
+          ext_decl_type = -1;
+          graph_insert_point[parent_graph] = temp3; // keep track of insertion point for gpu graph
+        }
+        // keep track of insertion point for gpu graph
+        // just before graph read function
+        else if(insert_point) {
+          // printf("TEST-2\n");
+          graph_insert_point[insert_point] = temp3;
+          insert_point = NULL;
+        }
       }
     }
 	| expression ',' assignment_expression{
@@ -670,18 +672,25 @@ declaration
   		$$=createdeclstmt($1,NULL,$2);
   		temp3=createstmt(DECL_STMT,NULL,NULL,LINENO);
   		temp3->stdecl=$$;
-  		if(temp1==NULL){
+      
+      if(temp1==NULL){
   			temp1=temp3;
   			G1=temp=temp1;
   		} else{
         linkstmt(&temp1,temp3);
   		}
       
-      if(ext_decl_type == 0) {
-        std::map<dir_decl*, statement*> *map = new std::map<dir_decl*, statement*>();
-        std::pair<statement*, std::map<dir_decl*, statement*>*> *pair = new std::pair<statement*, std::map<dir_decl*, statement*>*>(temp3, map);
-        graphs[$2] = pair;
-         // graph_info[$2] = temp3;
+      if(isGPU) {
+        if(ext_decl_type == 0) {
+          std::map<dir_decl*, statement*> *map = new std::map<dir_decl*, statement*>();
+          std::pair<statement*, std::map<dir_decl*, statement*>*> *pair = new std::pair<statement*, std::map<dir_decl*, statement*>*>(temp3, map);
+          graphs[$2] = pair;
+           // graph_info[$2] = temp3;
+        } else if(ext_decl_type == 2) {
+          fx_sets[$2] = temp3;
+        } else if(ext_decl_type == 3) {
+          fx_collections[$2] = temp3;
+        }
       }
       ext_decl_type = -1;
   	}
@@ -1017,8 +1026,12 @@ lib_type_specifier
   | POINT %prec POINT1 {        $$=createlibtypedef(POINT_TYPE,NULL);	}
   | EDGE '(' IDENTIFIER ')'  {     $$=createlibtypedef(EDGE_TYPE,$3);	}
   | POINT '(' IDENTIFIER ')' {         $$=createlibtypedef(POINT_TYPE,$3);	}
-  | SET {        $$=createlibtypedef(SET_TYPE,NULL);	}
-  | COLLECTION {        $$=createlibtypedef(COLLECTION_TYPE,NULL);	}
+  | SET {        $$=createlibtypedef(SET_TYPE,NULL);	
+      ext_decl_type = 2;
+    }
+  | COLLECTION {        $$=createlibtypedef(COLLECTION_TYPE,NULL);	
+      ext_decl_type = 3;
+    }
   ;
 
 list1 
@@ -1031,7 +1044,9 @@ list1
   	}
 	| EDGE'('IDENTIFIER')'{ $$=createlibtypedef(EDGE_TYPE,$3);	((tree_typedecl *)$$)->ppts=NULL;}
 	| GRAPH'('IDENTIFIER')'{ $$=createlibtypedef(GRAPH_TYPE,$3);	((tree_typedecl *)$$)->ppts=NULL;	}
-	| POINT'(' IDENTIFIER ')'{ $$=createlibtypedef(POINT_TYPE,$3);	((tree_typedecl *)$$)->ppts=NULL;	}
+	| POINT'(' IDENTIFIER ')'{ $$=createlibtypedef(POINT_TYPE,$3);	((tree_typedecl *)$$)->ppts=NULL;	
+      // printf("TEST %s %p %p\n", (tree_typedecl*)$3, (tree_typedecl*)$$, ((tree_typedecl*)$$)->next);
+    }
   ;
 
 alltype
@@ -1103,7 +1118,8 @@ direct_declarator
 		  ((dir_decl *)$$)->name=/*malloc(sizeof(char)*100); strcpy(((dir_decl *)$$)->name,*/$1;
 	  }
 	|  direct_declarator '['list1 ']' {
-		  ((dir_decl *)$1)->tp1=(tree_typedecl *)$3;
+		  // printf("TEST %s %p\n", ((dir_decl *)$1)->name, $3);
+      ((dir_decl *)$1)->tp1=(tree_typedecl *)$3;
 	  }
 	| '(' declarator ')'{
   		dir_decl *t1=$2; 

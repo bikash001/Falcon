@@ -1,4 +1,4 @@
-#include <symtabold.h>
+#include "symtabold.h"
 #include<stdlib.h>
 #include "externs.h"
 #include "treeprintcode1type.h"

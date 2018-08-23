@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include "falctypes.h"
-#include <symtabold.h>
+#include "symtabold.h"
 int morph_size,TOT_GPU_GRAPH;//
 int GLOBAL_ID_FLAG;
 int union_type;//0 means ipe and 1 means fpe for point,edge
