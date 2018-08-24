@@ -142,7 +142,7 @@ primary_expression
 	: IDENTIFIER {
       //	printf("XX\n");
       dir_decl *x=currsymtab->findsymbol($1);
-    	$$=new tree_expr(x);
+      $$=new tree_expr(x);
     	((tree_expr *)$$)->name=$1;
     	((tree_expr *)$$)->nodetype=-1;	}/*$$=new tree_expr();*/ /* need to add code to copy datatype information from dir_decl to tree_expr */
 	| constant {$$=$1;}
@@ -209,7 +209,7 @@ generic_association
 
 postfix_expression
 	: primary_expression %prec PR_EXPR1  {
-    	$$=$1; }
+      $$=$1; }
 	| postfix_expression '[' expression ']'{
 	    if(((tree_expr *)$1)->expr_type!=ARRREF){
       	tree_expr *t1;
@@ -328,19 +328,24 @@ postfix_expression
 	    $$=$1;
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addPointProperty"))){   
         adddynamicproperty(t1,P_P_TYPE,pt1);
-        graph_prop = t1->rhs;
+        // printf("--> %s\n", pt1->rhs->name);
+        // printf("-<> %s\n", ((tree_decl_stmt*)$5)->lhs->name);
+        // printf("TEST %s\n", pt1->rhs->lhs->name);
+        // printf("TEST %s %s\n", pt1->rhs->name, pt1->next->rhs->name);
+        // exit(0);
+        graph_prop = pt1->rhs;
         parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addEdgeProperty"))){
         adddynamicproperty(t1,E_P_TYPE,pt1);
-        graph_prop = t1->rhs;
+        graph_prop = t1->rhs->arglist->rhs;
         parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
       }
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addProperty"))){
         addgraphproperty(t1,G_P_TYPE,pt1);
-        graph_prop = t1->rhs;
+        graph_prop = t1->rhs->arglist->rhs;
         parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
       }

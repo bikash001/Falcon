@@ -804,6 +804,45 @@ static void find_properties(map<dir_decl*, vector<char*>*> &mp, statement *begin
 	}
 }
 
+statement* get_statement(dir_decl *g, char *name)
+{
+	map<dir_decl*, statement*> *mp = graphs[g]->second;
+	for(map<dir_decl*, statement*>::iterator it=mp->begin(); it!=mp->end(); ++it) {
+		if(strcmp(it->first->name, name) == 0) {
+			return it->second;
+		}
+	}
+	fprintf(stderr, "Error: statement declaring %s property not found.\n", name);
+	exit(0);
+}
+
+void get_property(char **type_ptr, char *size_ptr, statement *stmt)
+{
+	tree_expr *t1 = stmt->stassign->rhs;
+	dir_decl *parent = t1->lhs->lhs;
+	struct extra_ppts *ep = parent->ppts;
+	assign_stmt *pt1 = t1->rhs->arglist;
+	
+	while(ep) {
+		if(strcmp(ep->name, pt1->rhs->name) == 0) {
+			if(ep->t1->libdatatype == P_P_TYPE) {
+				sprintf(size_ptr, "npoints");
+			} else if(ep->t1->libdatatype == E_P_TYPE) {
+				sprintf(size_ptr, "nedges");
+			} else {
+				sprintf(size_ptr, "1");
+			}
+			break;
+		}
+		ep = ep->next;
+	}
+	
+	*type_ptr = t1->rhs->params->lhs->name;
+	// printf("--> %s %p\n", pt1->rhs->name, pt1->rhs->lhs);
+	// printf("--> %s", t1->rhs->params->lhs->name);
+	// exit(0);
+}
+
 // Utility function to walk through statements and call wal_exp() to replace old variables with new
 static void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *begin, map<dir_decl*, dir_decl*> &tab)
 {
@@ -850,11 +889,16 @@ static void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *be
 				int count = 0;
 				for(map<dir_decl*, vector<char*>*>::iterator it=mp.begin(); it!=mp.end(); ++it) {
 					vector<char*> *v = it->second;
-					count += sprintf(buff+count, "cudaMemcpy(&(%s.extra),((struct struct_%s  *)(%s.extra)),sizeof(struct struct_%s ),cudaMemcpyDeviceToHost);\n", 
-						it->first->name, it->first->name, tab[it->first]->name, it->first->name);
+					char var_name[10];
+					snprintf(var_name, 10, "_flcn%d", falc_ext++);
+					count += sprintf(buff+count, "struct struct_%s %s;\n", it->first->name, var_name);
+					count += sprintf(buff+count, "cudaMemcpy(&%s, (struct struct_%s *)(%s.extra), sizeof(struct struct_%s ),cudaMemcpyDeviceToHost);\n", 
+						var_name, it->first->name, tab[it->first]->name, it->first->name);
+					char *type,	size[10];
 					for(int ii=0; ii<v->size(); ++ii) {
-						count += sprintf(buff+count, "cudaMemcpy(&((%s.extra)->%s), (%s.extra)->%s, sizeof(%s)*(%s.%s), cudaMemcpyDeviceToHost);\n",
-							it->first->name, (*v)[ii], tab[it->first]->name, (*v)[ii], "int", it->first->name, (*v)[ii]);
+						get_property(&type, size, get_statement(it->first, (*v)[ii]));
+						count += sprintf(buff+count, "cudaMemcpy(((struct struct_%s *)(%s.extra))->%s, %s.%s, sizeof(%s)*(%s.%s), cudaMemcpyDeviceToHost);\n",
+							it->first->name, it->first->name, (*v)[ii], var_name, (*v)[ii], type, it->first->name, size);
 					}
 				}
 				if(count > 0) {
