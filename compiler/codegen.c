@@ -35,6 +35,7 @@ extern int CONVERT_VERTEX_EDGE;
 int merge_bracket = 0;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 char *vb_forcondarr = NULL;    // stores condition in conditional foreach for vertex based
+extern int stream_count;
 
 
 void findstructref(dir_decl *d1,tree_expr *expr) {
@@ -893,8 +894,19 @@ void statement::codeGen(FILE *FP1) {
                             if(this->feb==0) {
                                 if(this->stassign!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
                                     dir_decl *setvar=NULL;
-                                    fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
-
+                                    if(this->comma) {
+                                        if(stream_count > 0){
+                                            char buff[20];
+                                            snprintf(buff, 20, "_flcn_stream%d", stream_count++);
+                                            fprintf(FP1,"cudaSetDevice(%d);\ncudaStream_t %s;\ncudaStreamCreate(&%s);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d,0,%s>>>(",
+                                                d2->dev_no, buff, buff, d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no, buff);
+                                        } else {
+                                            stream_count++;
+                                            fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                        }
+                                    } else {
+                                        fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                    }
                                     assign_stmt *ta=this->stassign->rhs->arglist;
                                     ta=ta->next;
                                     int cnt=0;
@@ -966,7 +978,11 @@ void statement::codeGen(FILE *FP1) {
                             if(this->feb==0) {
                                 dir_decl *setvar=NULL;
                                 if(this->stassign!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
-                                    fprintf(FP1,"#pragma omp parallel for   num_threads(FALC_THREADS)\nfor(int i=0;i<%s.npoints;i++)%s(i,",d2->name,this->stassign->rhs->name);
+                                    if(this->comma) {
+                                        fprintf(FP1,"#pragma omp parallel num_threads(FALC_THREADS)\n{\n#pragma omp for nowait\nfor(int i=0;i<%s.npoints;i++)%s(i,",d2->name,this->stassign->rhs->name);
+                                    } else {
+                                        fprintf(FP1,"#pragma omp parallel for   num_threads(FALC_THREADS)\nfor(int i=0;i<%s.npoints;i++)%s(i,",d2->name,this->stassign->rhs->name);
+                                    }
                                     assign_stmt *ta=this->stassign->rhs->arglist;
                                     ta=ta->next;
                                     while(ta!=NULL && ta->next!=NULL) {
@@ -982,7 +998,11 @@ void statement::codeGen(FILE *FP1) {
                                         char temparr[200];
                                         for(int i=0; i<200; i++)temparr[i]='\0';
                                         ta->rhs->printcode1(ta->rhs,temparr);
-                                        fprintf(FP1,"%s);",temparr);
+                                        if(this->comma) {
+                                            fprintf(FP1,"%s);\n}\n",temparr);
+                                        } else {
+                                            fprintf(FP1,"%s);",temparr);
+                                        }
                                         if(ta->rhs->lhs && ta->rhs->lhs->libdtype==SET_TYPE )setvar=ta->rhs->lhs;
                                     }
 
@@ -1051,7 +1071,19 @@ void statement::codeGen(FILE *FP1) {
                     if(d2->gpu==1) {
                         if(this->feb==0) {
                             if(this->stassign!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
-                                fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                if(this->comma) {
+                                    if(stream_count > 0){
+                                        char buff[20];
+                                        snprintf(buff, 20, "_flcn_stream%d", stream_count++);
+                                        fprintf(FP1,"cudaSetDevice(%d);\ncudaStream_t %s;\ncudaStreamCreate(&%s);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d,0,%s>>>(",
+                                            d2->dev_no, buff, buff, d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no, buff);
+                                    } else {
+                                        stream_count++;
+                                        fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                    }
+                                } else {
+                                    fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                }
                                 assign_stmt *ta=this->stassign->rhs->arglist;
                                 ta=ta->next;
                                 while(ta!=NULL && ta->next!=NULL) {
@@ -1059,7 +1091,11 @@ void statement::codeGen(FILE *FP1) {
                                     ta=ta->next;
                                 }
                                 if(ta!=NULL)fprintf(FP1,"%s,kk);",ta->rhs->name);
-                                fprintf(FP1,"}\ncudaDeviceSynchronize();\ncudaSetDevice(0);\n");
+                                if(this->comma) { // remove barrier
+                                    fprintf(FP1,"}\ncudaSetDevice(0);\n");
+                                } else {
+                                    fprintf(FP1,"}\ncudaDeviceSynchronize();\ncudaSetDevice(0);\n");
+                                }
                             }
                             if(this->stassign!=NULL &&this->stassign->lhs!=NULL && this->stassign->lhs->expr_type==STRUCTREF) {
                                 fsetpos(FP1, &position);

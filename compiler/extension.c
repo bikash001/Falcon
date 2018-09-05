@@ -14,6 +14,7 @@ extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etyp
 extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 extern int CONVERT_VERTEX_EDGE;
 int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
+int stream_count = 0;
 std::map<dir_decl*, statement*> graph_insert_point; //store location to insert gpu graph
 extern tree_expr *temp_stmt_add;
 
