@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <typeinfo>
+#include <vector>
 #include "symtabold.h"
 int GPUCODEFLAG=0;
 int ERRPRINT;
@@ -70,7 +71,7 @@ bool assflag;
 // Variable declaration for FALCON extension
 // #define DEBUGGING
 int CONVERT_VERTEX_EDGE = 0;   // flag for different code generation (vertex & edge based)
-extern std::set<statement*> foreach_list;
+extern std::vector<statement*> foreach_list;
 extern void convert_vertex_edge();
 int level_of_foreach = 0;
 bool isGPU = false;
@@ -1654,6 +1655,7 @@ parallel_statement
   : PARALLEL SECTIONS compound_begin sections compound_end { 
   		$3=sblock_begin[sbtop];
   	  ((statement *)$3)->sttype=SECTIONS_STMT;
+      ((statement *)$3)->end_stmt = temp3;
     }
 	;
 
@@ -1685,7 +1687,7 @@ labeled_statement
   			statement *t2=$3;
   			t2->prev->next=t4;
   			t4->next=t2;
-        t4->end_stmt = temp3;
+        // t4->end_stmt = temp3;
   		} else {
   		  t4->next=temp3;
   			temp3->prev->next=t4;
@@ -1698,7 +1700,7 @@ labeled_statement
   			statement *t2=$4;
   			t2->prev->next=t4;
   			t4->next=t2;
-        t4->end_stmt = temp3;
+        // t4->end_stmt = temp3;
   		} else {
   		  t4->next=temp3;; 
   			temp3->prev->next=t4;
@@ -1711,7 +1713,7 @@ labeled_statement
   			statement *t2=$3; 
   			t4->next=t2;
   			t2->prev->next=t4;
-        t4->end_stmt = temp3;
+        // t4->end_stmt = temp3;
   		} else {
   		  t4->next=temp3;
   			temp3->prev->next=t4;
@@ -1837,6 +1839,7 @@ expression_statement
 single_statement 
 	: SINGLE '(' expression ')' statement %prec THEN {
   		statement *t4=createstmt(SINGLE_STMT,((assign_stmt *)$3)->rhs,NULL,LINENO);
+      t4->end_stmt = temp3;
   		t4->stassign=(assign_stmt *)$3;
   	  tree_expr *bar=t4->expr1;
   		if(bar->expr_type==VAR && bar->libdtype==COLLECTION_TYPE)barrier=1;
@@ -1845,6 +1848,7 @@ single_statement
     }
   | SINGLE '(' expression ')' statement ELSE statement{
   		statement *t4=createstmt(SINGLE_STMT,((assign_stmt *)$3)->rhs,NULL,LINENO);
+      t4->end_stmt = temp3;
   		t4->stassign=(assign_stmt *)$3;
   	  tree_expr *bar=t4->expr1;
   		if(bar->expr_type==VAR && bar->libdtype==COLLECTION_TYPE)barrier=1;
@@ -1862,6 +1866,7 @@ selection_statement
       //fprintf(FP1,"/*IFSTMT*/");
       //if(t1->nodetype==TREE_IF)
       //fprintf(FP1,"//if else if \n");
+      t4->end_stmt = temp3;
       createifstmt(&t4,&t1,&t2,&temp3,1);
       //if(temp1->sttype==IF_STMT)fprintf(FP1,"//IF ELSE IF \n");
       char arr[100];
@@ -1872,11 +1877,13 @@ selection_statement
   		statement *t4=createstmt(IF_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
   		statement *t2=(statement *)$5;
       //fprintf(FP1,"//else sttype %d ",t2->sttype);
+      t4->end_stmt = temp3;
       createifstmt(&t4,NULL,&t2,&temp3,0);
   	}
   | SWITCH '(' expression ')' statement{
   		statement *t4=createstmt(SWITCH_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
-  		t4->f1=((statement *)$5);
+  		t4->end_stmt = temp3;
+      t4->f1=((statement *)$5);
   		((statement *)$5)->prev->prev->next=t4;
   		temp3=t4;/*statement *t2=(statement *)$5; t2->prev->next=temp3;((assign_stmt *)$3)->rhs->pflag=100;temp1=temp3;*/
       FUNCALL_FLAG=0;
@@ -2066,7 +2073,7 @@ iteration_statement
         fnamescond[temp1->stassign->rhs->name]=temp3;
         temp3->prev->next=temp3;temp1=temp3;
         
-        if(level_of_foreach == 1) foreach_list.insert(temp3);
+        if(level_of_foreach == 1) foreach_list.push_back(temp3);
       }
     	currsymtab=currsymtab->parent;
       KERNEL=0;
@@ -2106,7 +2113,7 @@ iteration_statement
 			  temp3->prev->next=temp3;
 			  temp1=temp3;
 
-        if(level_of_foreach == 1) foreach_list.insert(temp3);
+        if(level_of_foreach == 1) foreach_list.push_back(temp3);
 	    }
 	    currsymtab=currsymtab->parent;
 	    KERNEL=0;

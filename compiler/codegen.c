@@ -860,116 +860,6 @@ void statement::codeGen(FILE *FP1) {
         fprintf(FP1,");");
     }
     if(this->sttype==FOREACH_STMT ) {
-    //     if (this->stassign==NULL) { 	// foreach_stmt with compound statement
-    //     	level_of_foreach++;
-
-	   //      if (CONVERT_VERTEX_EDGE && level_of_foreach==1 && this->next && this->next->sttype==FOREACH_STMT &&
-    //             this->itr == POINT_ITYPE && (this->next->itr == NBRS_ITYPE || this->next->itr == INNBRS_ITTYPE ||
-    //                 this->next->itr == OUTNBRS_ITYPE)) {
-	   //      	merge_bracket = 1;    // merge two end bracket to one.
-    //             statement *next_stmt = this->next;
-                
-    //             // foreach iterator
-    //             dir_decl *d1=new dir_decl();
-    //             d1->name=malloc(sizeof(char)*10);
-    //             strcpy(d1->name, "e");
-    //             d1->libdtype=ITERATOR_TYPE;
-    //             d1->dtype=-1;
-    //             d1->forit=-1;
-    //             d1->parent = this->expr1->lhs->parent;
-
-	   //      	// type declaration
-	   //      	tree_typedecl *ptr = new tree_typedecl();
-			 //    ptr->libdatatype = POINT_TYPE;	//point type
-			 //    ptr->name=malloc(sizeof(char )*100);
-			 //    strcpy(ptr->name, "point ");
-
-			 //   	// variable
-			 //    dir_decl *pointA = this->expr1->lhs;
-    //             pointA->rhs = NULL;
-    //             pointA->parent = NULL;
-    //             pointA->libdtype = POINT_TYPE;
-    //             pointA->dtype = -1;
-    //             pointA->forit = 0;
-    //             dir_decl *pointB = next_stmt->expr1->lhs;
-
-    //             pointB->libdtype = POINT_TYPE;
-    //             pointB->dtype = -1;
-    //             pointB->parent = NULL;
-    //             pointB->forit = 0;
-    //             pointB->rhs = NULL;
-
-    //             // initializer
-		  // 		tree_expr *expr = new tree_expr(d1);
-			 //    expr->name = malloc(sizeof(char)*2);
-			 //    expr->expr_type = VAR;
-
-			 //    tree_expr *src = new tree_expr();
-			 //    src->name = malloc(sizeof(char)*4);
-			 //    strcpy(src->name, "src");
-			 //    src->expr_type = VAR;
-
-			 //    tree_expr *dst = new tree_expr();
-			 //    dst->name = malloc(sizeof(char)*4);
-			 //    strcpy(dst->name, "dst");
-			 //    dst->expr_type = VAR;
-
-				// tree_expr *node1 = binaryopnode(expr,NULL,STRUCTREF,-1);
-				// tree_expr *node2 = binaryopnode(expr,NULL,STRUCTREF,-1);
-				// if (next_stmt->itr == 4) { // outnbrs
-    //                 node1->rhs = src;
-    //                 node2->rhs = dst;    
-    //             } else {
-    //                 node1->rhs = dst;
-    //                 node2->rhs = src;
-    //             }
-	        	
-	   //      	pointA->rhs = node1;
-	   //      	pointB->rhs = node2;
-	   //      	pointA->nextv = pointB;
-
-	   //      	// create statement
-	   //      	tree_decl_stmt *tstmt = new tree_decl_stmt();
-				// tstmt->rhs=NULL;
-				// tstmt->lhs=ptr;
-				// tstmt->dirrhs=pointA;
-
-				// statement *stmt=new statement();
-				// stmt->sttype=DECL_STMT;
-				// stmt->expr1=NULL;
-				// stmt->name=NULL;
-				// stmt->lineno=0;
-				// stmt->stdecl = tstmt;
-
-    //             this->itr = EDGES_ITYPE;
-    //             this->expr1->lhs = d1;
-	   //      	this->expr3 = NULL;
-
-				// this->next = stmt;
-				// stmt->prev = this;
-				// stmt->next = next_stmt->next;
-                
-    //             // if (next_stmt->expr4 != NULL) { // condition should be after variable declaration
-    //             //     merge_bracket = 0; // since new if statement is introduced
-    //             // }
-
-    //             this->codeGen(FP1);
-	   //      	return;
-	   //      }
-    //     }
-        // if (this->stassign){
-            // fclose(FP1);
-            // exit(0);
-            // printf("%s %s\n", "codegen-943", this->stassign->rhs->name);
-            // for (std::map<char *,statement *>::iterator i = fnames.begin(); i != fnames.end(); ++i)
-            // {
-            //     // if (!strcmp(i->first, this->stassign->rhs->name)) {
-            //         printf("line-947 %s\n", i->first);
-            //         printf("%d %d %d\n", i->second->sttype, i->second->next->sttype, i->second->next->next->sttype);
-            //     // }
-            // }
-        // }
-        
         int it=this->itr;
         dir_decl *d2=this->expr2->lhs;
         if(d2 && d2->gpu==0)foreachhostflag++;
@@ -1018,7 +908,12 @@ void statement::codeGen(FILE *FP1) {
                                             fprintf(FP1,"%s,kk);\n",ta->rhs->name);
                                         if(ta->rhs && ta->rhs->lhs && ta->rhs->lhs->libdtype==SET_TYPE )setvar=ta->rhs->lhs;
                                     }
-                                    fprintf(FP1,"}\ncudaDeviceSynchronize();\ncudaSetDevice(0);\n");
+                                    
+                                    if(this->comma) { // remove barrier
+                                        fprintf(FP1,"}\ncudaSetDevice(0);\n");
+                                    } else {
+                                        fprintf(FP1,"}\ncudaDeviceSynchronize();\ncudaSetDevice(0);\n");
+                                    }
                                     struct UNION_KER *tempu=head_position;
                                     while(tempu!=NULL) {
                                         if(!strcmp(tempu->name,this->stassign->rhs->name) && strlen(tempu->name)==strlen(this->stassign->rhs->name)) {
