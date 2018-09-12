@@ -2,6 +2,6 @@ bin
 */generated/*/*.*
 tmp
 compiler/original/
-compiler/obj/
+compiler/obj/*
 compiler/y.tab.*
 flcn

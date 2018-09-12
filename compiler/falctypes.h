@@ -520,7 +520,8 @@ public:
     char  *name;
     bool comma;
     bool feb;
-    class statement *end_stmt; // end statement of current scope
+    class statement *end_stmt; // end statement of function, loop, if, switch
+    class statement *start_stmt; // start statement of a loop-block
     print();
     void codeGen(FILE *FP);
     void codeGen1();

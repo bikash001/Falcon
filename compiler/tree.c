@@ -2564,6 +2564,7 @@ statement::statement() {
     expr1=expr2=expr3=expr4=expr5=NULL;
     noprint=false;
     end_stmt=NULL;
+    start_stmt=NULL;
 }
 iter_stmt::iter_stmt() {
     expr1=NULL;

@@ -10,7 +10,7 @@ CFLAGS=  -w -fpermissive -std=c++03
 DEPS = externs.h symtab.h falctypes.h symtabold.h tree.h codegen.h
 
 ODIR=obj
-_OBJ = symtab.o codegen.o tree.o astprint.o lex.yy.o y.tab.o aux.o extension.o
+_OBJ = symtab.o codegen.o tree.o astprint.o y.tab.o lex.yy.o aux.o extension.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 ../flcn: $(OBJ)

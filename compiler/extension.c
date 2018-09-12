@@ -27,7 +27,7 @@ std::map<dir_decl*, statement*> fx_sets;
 std::map<dir_decl*, statement*> fx_collections;
 struct comparator;
 static void walk_find_prop_util(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, assign_stmt *astmt, dir_decl *dg);
-
+static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, tree_decl_stmt *params, assign_stmt *args);
 
 struct comparator
 {
@@ -549,9 +549,14 @@ static void get_variables_util_exp(set<dir_decl *> &lset, set<dir_decl *> &gset,
 }
 
 // Utility function to find global and local variables.
-static void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_rset, set<dir_decl *> &global_wset, statement *begin, statement *end)
+static void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &global_rset, set<dir_decl *> &global_wset, statement *begin, statement *end, set<statement*> &visited)
 {
 	while(begin != NULL && begin != end){
+		if(visited.find(begin) != visited.end()) {
+			return;
+		} else {
+			visited.insert(begin);
+		}
 		if(begin->sttype == DECL_STMT) {
 			dir_decl *expr = begin->stdecl->dirrhs;
 			while(expr) {
@@ -582,7 +587,25 @@ static void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &glob
 						get_variables_util_exp(local_set, global_rset, astmt->lhs);
 					}
 					if(astmt->rhs) {
-						get_variables_util_exp(local_set, global_rset, astmt->rhs);
+						if(astmt->rhs->expr_type == FUNCALL) {
+							// printf("TEST-590 %s\n", astmt->rhs->name);
+
+							statement *target = get_function(astmt->rhs->name);
+							if(target == NULL) {
+								fprintf(stderr, "Error: function %s not defined.\n", astmt->rhs->name);
+								exit(0);
+							}
+							tree_decl_stmt *params = target->stdecl->dirrhs->params;
+							
+							std::set<dir_decl *> lset;
+							while(params) {
+								lset.insert(params->dirrhs);
+								params = params->next;
+							}
+							get_variables_util(lset, global_rset, global_wset, target->next->next, target->end_stmt, visited);
+						} else {
+							get_variables_util_exp(local_set, global_rset, astmt->rhs);
+						}
 					}
 				}
 			} else if(begin->sttype == FOR_STMT) {
@@ -643,6 +666,15 @@ static void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &glob
 					}
 					astmt = astmt->next;
 				}
+			} else if(begin->sttype == FOR_EBLOCK_STMT) {
+				get_variables_util(local_set, global_rset, global_wset, begin->start_stmt, begin, visited);
+			} else if(begin->sttype == EBLOCK_STMT) {
+				if(begin->start_stmt) {
+					get_variables_util(local_set, global_rset, global_wset, begin->start_stmt, begin, visited);
+				}
+			} else if(begin->sttype == DOWHILEEXPR_STMT) {
+				get_variables_util_exp(local_set, global_rset, begin->expr1);
+				get_variables_util(local_set, global_rset, global_wset, begin->start_stmt, begin, visited);
 			} else {
 				if(begin->expr1) {
 					get_variables_util_exp(local_set, global_rset, begin->expr1);
@@ -660,13 +692,13 @@ static void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &glob
 					get_variables_util_exp(local_set, global_rset, begin->expr5);
 				}
 				if(begin->f1) {
-					get_variables_util(local_set, global_rset, global_wset, begin->f1, end);
+					get_variables_util(local_set, global_rset, global_wset, begin->f1, end, visited);
 				}
 				if(begin->f2) {
-					get_variables_util(local_set, global_rset, global_wset, begin->f2, end);
+					get_variables_util(local_set, global_rset, global_wset, begin->f2, end, visited);
 				}
 				if(begin->f3) {
-					get_variables_util(local_set, global_rset, global_wset, begin->f3, end);
+					get_variables_util(local_set, global_rset, global_wset, begin->f3, end, visited);
 				}
 			}
 		}
@@ -855,9 +887,14 @@ static void walk_find_prop_util(map<dir_decl*, set<char*, comparator>*> &rmp, ma
 }
 
 // @params dg: default graph to be used if parent of point or edge is not set
-static void find_properties(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, statement *begin, statement *end, dir_decl *dg)
+static void find_properties(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, statement *begin, statement *end, dir_decl *dg, set<statement*> &visited)
 {
 	while(begin && (begin != end)) {
+		if(visited.find(begin) != visited.end()) {
+			return;
+		} else {
+			visited.insert(begin);
+		}
 		if(begin->sttype == DECL_STMT) {
 			dir_decl *expr = begin->stdecl->dirrhs;
 			while(expr) {
@@ -889,18 +926,52 @@ static void find_properties(map<dir_decl*, set<char*, comparator>*> &rmp, map<di
 				walk_find_prop(rmp, begin->expr5, dg);
 			}				
 			if(begin->f1) {
-				find_properties(rmp, wmp, begin->f1, end, dg);
+				find_properties(rmp, wmp, begin->f1, end, dg, visited);
 			}
 			if(begin->f2) {
-				find_properties(rmp, wmp, begin->f2, end, dg);
+				find_properties(rmp, wmp, begin->f2, end, dg, visited);
 			}
 			if(begin->f3) {
-				find_properties(rmp, wmp, begin->f3, end, dg);
+				find_properties(rmp, wmp, begin->f3, end, dg, visited);
 			}
 		} else {
-			if(begin->stassign) {
-				assign_stmt *arglist = begin->stassign->rhs->arglist;
-				walk_find_prop_util(rmp, wmp, arglist, dg);
+			if(begin->expr4) {	// condition of foreach
+				walk_find_prop(rmp, begin->expr4, dg);
+			}
+			if(begin->stassign) { // function call
+				assign_stmt *astmt = begin->stassign;
+				if(astmt->lhs) {
+					walk_find_prop(wmp, astmt->lhs, dg);
+				}
+				if(astmt->rhs) {
+					assign_stmt *arglist = begin->stassign->rhs->arglist;
+					walk_find_prop_util(rmp, wmp, arglist, dg);
+
+					if(astmt->rhs->expr_type == FUNCALL) {
+						// printf("TEST-590 %s\n", astmt->rhs->name);
+
+						statement *target = get_function(astmt->rhs->name);
+						if(target == NULL) {
+							fprintf(stderr, "Error: function %s not defined.\n", astmt->rhs->name);
+							exit(0);
+						}
+						tree_decl_stmt *params = target->stdecl->dirrhs->params;
+						
+						dir_decl *gp = NULL;
+						while(params) {
+							if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
+								gp = params->dirrhs;
+							}
+							params = params->next;
+						}
+
+						find_properties(rmp, wmp, target->next->next, target->end_stmt, gp, visited);
+						replace_map_variables(rmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+						replace_map_variables(wmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+					} else {
+						walk_find_prop(rmp, astmt->rhs, dg);
+					}
+				}
 			}
 		}
 		
@@ -1004,7 +1075,8 @@ static void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *be
 			if(!(begin->prev && (begin->prev->sttype == EMPTY_STMT) && (begin->prev->lineno==2))) {
 				// code for copying memory from gpu to cpu.
 				map<dir_decl*, set<char*, comparator>*> rmp, wmp;
-				find_properties(rmp, wmp, begin, begin->end_stmt, NULL);
+				set<statement*> visited;
+				find_properties(rmp, wmp, begin, begin->end_stmt, NULL, visited);
 
 				statement *temp = new statement();
 				temp->sttype = EMPTY_STMT;
@@ -1454,6 +1526,7 @@ static void copy(map<dir_decl*, set<char*, comparator>*> &lhs, map<dir_decl*, se
 	}
 }
 
+
 static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, tree_decl_stmt *params, assign_stmt *args)
 {
 	int count = 0;
@@ -1505,37 +1578,7 @@ static void print(map<dir_decl*, set<char*, comparator>*> &tab, string ss)
 // Finds global variables used in kernels
 void get_variables()
 {
-	// printf("%s\n", "set data");
-	// print_map(fx_sets);
-	// printf("%s\n", "collection_data");
-	// print_map(fx_collections);
-	// for(map<dir_decl*, pair<statement*, map<dir_decl*, statement*>*>*>::iterator ii = graphs.begin(); ii != graphs.end(); ++ii) {
-	// 	map<dir_decl*, statement*> *graph = ii->second->second;
-	// 	printf("GRAPH %s\n", ii->first->name);
-	// 	for(map<dir_decl*, statement*>::iterator itr = graph->begin(); itr!=graph->end(); ++itr) {
-	// 		printf("-->%s\n", itr->first->name);
-	// 	}
-	// }
-	// return;
-	// struct ker_ppts
-	// {
-	// 	set<dir_decl*> *rset, *wset;
-	// 	set<char*, comparator> *arset, *awset;
-	// };
-
 	std::set<dir_decl *> gset;	// keeps gpu global variables
-	// set<char*, comparator> seen_functions;			// functions already seeen
-	// set<dir_decl *> *pk_rset, *pk_wset, *nk_rset, *nk_wset, *t_set;					// 
-	// set<char*, comparator> *pkattr_rset, *pkattr_wset, *nkattr_rset, *nkattr_wset, *ta_set;
-	// statement *next = NULL, *prev = NULL;
-	// pk_rset = new set<dir_decl*>();
-	// pk_wset = new set<dir_decl*>();
-	// nk_rset = new set<dir_decl*>();
-	// nk_wset = new set<dir_decl*>();
-	// pkattr_rset = new set<char*, comparator>();
-	// pkattr_wset = new set<char*, comparator>();
-	// nkattr_rset = new set<char*, comparator>();
-	// nkattr_wset = new set<char*, comparator>();
 	map<dir_decl*, set<char*, comparator>*> rmap1, rmap2, wmap1, wmap2, *curr_rmap, *curr_wmap, *next_rmap, *next_wmap;
 	curr_rmap = &rmap1;
 	next_rmap = &rmap2;
@@ -1576,7 +1619,12 @@ void get_variables()
 			// find global variables
 			set<dir_decl*> &k_rset = *curr_rset;
 			set<dir_decl*> &k_wset = *curr_wset;
-			get_variables_util(local_set, k_rset, k_wset, target->next->next, target->end_stmt);
+			set<statement*> visited;
+			get_variables_util(local_set, k_rset, k_wset, target->next->next, target->end_stmt, visited);
+			
+			// store gpu variables
+			gset.insert(k_rset.begin(), k_rset.end());
+			gset.insert(k_wset.begin(), k_wset.end());
 
 			// variables after
 			local_set.clear();
@@ -1586,27 +1634,33 @@ void get_variables()
 				end = function_end(stmt);
 			}
 			set<dir_decl*> rset, wset;
-			get_variables_util(local_set, rset, wset, stmt->next, end);
+			visited.clear();
+			get_variables_util(local_set, rset, wset, stmt->next, end, visited);
 			
-			if(!(is_dependency(k_rset, wset) || is_dependency(rset, k_wset))) {
+			bool rm = !(is_dependency(k_rset, wset) || is_dependency(rset, k_wset));
+			if(rm || prev_rm) {
 				// find attributes of graph
 				map<dir_decl*, set<char*, comparator>*> &krmap = *curr_rmap, &kwmap = *curr_wmap;
 				map<dir_decl*, set<char*, comparator>*>::iterator jj;
-				find_properties(krmap, kwmap, target->next->next, target->end_stmt, gp);
+				visited.clear();
+				find_properties(krmap, kwmap, target->next->next, target->end_stmt, gp, visited);
 				replace_map_variables(krmap, target->stdecl->dirrhs->params, stmt->stassign->rhs->arglist);
 				replace_map_variables(kwmap, target->stdecl->dirrhs->params, stmt->stassign->rhs->arglist);
 				
 				// attributes after
 				map<dir_decl*, set<char*, comparator>*> crmap, cwmap;
-				find_properties(crmap, cwmap, stmt, end, NULL);
-				
-				bool rm = true;
-				if(is_dependency(krmap, cwmap) || is_dependency(crmap, kwmap)) { // dependency exist
-					rm = false;
+				if(rm) {
+					visited.clear();
+					find_properties(crmap, cwmap, stmt, end, NULL, visited);
+					
+					if(is_dependency(krmap, cwmap) || is_dependency(crmap, kwmap)) { // dependency exist
+						rm = false;
+					}
 				}
 
 				if(prev_rm) {
-					if(!(is_dependency(*curr_rset, *next_wset) || is_dependency(*next_rset, *curr_wset) || 
+					if(!(is_dependency(*curr_rset, *next_wset) || is_dependency(*next_rset, *curr_wset) ||
+						is_dependency(rset, *next_wset) || is_dependency(*next_rset, wset) || 
 						is_dependency(*curr_rmap, *next_wmap) || is_dependency(*next_rmap, *curr_wmap))) {
 						foreach_list[i-1]->comma = true;
 						// copy data
@@ -1642,23 +1696,10 @@ void get_variables()
 				curr_wmap->clear();
 				curr_rset->clear();
 				curr_wset->clear();
-			} else if(prev_rm) {
-				if(!(is_dependency(*curr_rset, *next_wset) || is_dependency(*next_rset, *curr_wset) || 
-					is_dependency(*curr_rmap, *next_wmap) || is_dependency(*next_rmap, *curr_wmap))) {
-					foreach_list[i-1]->comma = true;
-				}
-
+			} else {
 				prev_rm = false;
 				curr_rset->clear();
 				curr_wset->clear();
-			}
-
-			// store gpu variables
-			for(set<dir_decl*>::iterator kk=k_rset.begin(); kk!=k_rset.end(); ++kk) {
-				gset.insert(*kk);
-			}
-			for(set<dir_decl*>::iterator kk=k_wset.begin(); kk!=k_wset.end(); ++kk) {
-				gset.insert(*kk);
 			}
 		}
 	}

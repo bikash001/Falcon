@@ -1895,6 +1895,7 @@ iteration_statement
 		  statement *t1;
   		if(temp3->sttype==EBLOCK_STMT){
   			t1=sblock_begin[sbtop];
+        temp3->start_stmt = t1;
   			t1->sttype=WHILE_STMT;
   			t1->expr1=((assign_stmt *)$3)->rhs;
         t1->end_stmt = temp3;
@@ -1909,6 +1910,8 @@ iteration_statement
   		statement *t1=sblock_begin[sbtop];
   		t1->sttype=DOWHILE_STMT;
   		statement *t4=createstmt(DOWHILEEXPR_STMT,((assign_stmt *)($5))->rhs,NULL,LINENO);
+      t1->end_stmt = t4;
+      t4->start_stmt = t1;
       linkstmt(&temp1,temp3);
   		((assign_stmt *)$5)->rhs->pflag=100;
   		FUNCALL_FLAG=0;
@@ -1929,6 +1932,7 @@ iteration_statement
   			t2->next=t1; 
   			t1->prev=t2;
         t1->end_stmt = temp3;
+        temp3->start_stmt = t1;
       } else {
         initforstmt1(&temp3,(assign_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)NULL);
   			statement *t2=temp3;
@@ -1958,6 +1962,7 @@ iteration_statement
   			t2->next=t1;
   			t1->prev=t2;
         t1->end_stmt = temp3;
+        temp3->start_stmt = t1;
       } else {
         initforstmt1(&temp3,(assign_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)$5);
   		  statement *t2=temp3;
@@ -1989,6 +1994,7 @@ iteration_statement
   			t2->next=t1;
   			t1->prev=t2;
         t1->end_stmt = temp3;
+        temp3->start_stmt = t1;
   		} else {
         initforstmt(&temp3,(tree_decl_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)NULL);
   			statement *t2=temp3;
@@ -2020,6 +2026,7 @@ iteration_statement
   			t2->next=t1;
   			t1->prev=t2;
         t1->end_stmt = temp3;
+        temp3->start_stmt = t1;
   	  } else { 
         initforstmt(&temp3,(tree_decl_stmt *)$3,(assign_stmt *)$4,(assign_stmt *)$5);
   			statement *t2=temp3;
@@ -2058,6 +2065,7 @@ iteration_statement
         t1->feb=1;
         initforeach1(&t1,(char *)$3,(char *)$5,(int)$7);
         t1->end_stmt = temp3;
+        temp3->start_stmt = t1;
 		  } else {
         // printf("%s %d\n", "grammar.y-1813", temp1->prev->sttype);
         if(temp1->expr4!=NULL){
@@ -2100,6 +2108,7 @@ iteration_statement
         t1->sttype=FOREACH_STMT;
         initforeach(&t1,&temp3,(char *)$3,(char *)$5,5);
         t1->end_stmt = temp3;
+        temp3->start_stmt = t1;
 		  } else {
         if(temp3->expr4!=NULL){
 				  fnamescond[temp1->stassign->rhs->name]=temp1;
