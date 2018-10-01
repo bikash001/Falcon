@@ -78,7 +78,7 @@ bool isGPU = false;
 extern int falc_ext;
 int ext_decl_type = -1;
 // extern void convert_to_gpu();
-extern void get_variables();
+extern void get_variables(bool, bool=false);
 // extern std::map<dir_decl*, statement*> graph_info;
 extern std::map<dir_decl*, std::pair<statement*, std::map<dir_decl*, statement*>*>* > graphs;
 dir_decl *graph_prop = NULL, *parent_graph = NULL;
@@ -1663,10 +1663,12 @@ sections
   : SECTION compound_statement  { 
   		$2=sblock_begin[sbtop];
   		((statement *)$2)->sttype=SECTION_STMT;
+      ((statement *)$2)->end_stmt = temp3;
     }
   | sections SECTION compound_statement { 
   		$3=sblock_begin[sbtop];
   		((statement *)$3)->sttype=SECTION_STMT;
+      ((statement *)$3)->end_stmt = temp3;
     }
   ;
 
@@ -1839,7 +1841,7 @@ expression_statement
 single_statement 
 	: SINGLE '(' expression ')' statement %prec THEN {
   		statement *t4=createstmt(SINGLE_STMT,((assign_stmt *)$3)->rhs,NULL,LINENO);
-      t4->end_stmt = temp3;
+      // t4->end_stmt = temp3;
   		t4->stassign=(assign_stmt *)$3;
   	  tree_expr *bar=t4->expr1;
   		if(bar->expr_type==VAR && bar->libdtype==COLLECTION_TYPE)barrier=1;
@@ -1848,7 +1850,7 @@ single_statement
     }
   | SINGLE '(' expression ')' statement ELSE statement{
   		statement *t4=createstmt(SINGLE_STMT,((assign_stmt *)$3)->rhs,NULL,LINENO);
-      t4->end_stmt = temp3;
+      // t4->end_stmt = temp3;
   		t4->stassign=(assign_stmt *)$3;
   	  tree_expr *bar=t4->expr1;
   		if(bar->expr_type==VAR && bar->libdtype==COLLECTION_TYPE)barrier=1;
@@ -1866,23 +1868,23 @@ selection_statement
       //fprintf(FP1,"/*IFSTMT*/");
       //if(t1->nodetype==TREE_IF)
       //fprintf(FP1,"//if else if \n");
-      t4->end_stmt = temp3;
       createifstmt(&t4,&t1,&t2,&temp3,1);
       //if(temp1->sttype==IF_STMT)fprintf(FP1,"//IF ELSE IF \n");
       char arr[100];
       ((assign_stmt *)($3))->printcode1(arr,1);
       //fprintf(FP1,"%s \n",arr);
+      t4->end_stmt = temp3;
 	  }
   | IF '(' expression ')' statement %prec THEN{
   		statement *t4=createstmt(IF_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
   		statement *t2=(statement *)$5;
       //fprintf(FP1,"//else sttype %d ",t2->sttype);
-      t4->end_stmt = temp3;
       createifstmt(&t4,NULL,&t2,&temp3,0);
+      t4->end_stmt = temp3;
   	}
   | SWITCH '(' expression ')' statement{
   		statement *t4=createstmt(SWITCH_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
-  		t4->end_stmt = temp3;
+  		// t4->end_stmt = temp3;
       t4->f1=((statement *)$5);
   		((statement *)$5)->prev->prev->next=t4;
   		temp3=t4;/*statement *t2=(statement *)$5; t2->prev->next=temp3;((assign_stmt *)$3)->rhs->pflag=100;temp1=temp3;*/
@@ -1902,6 +1904,7 @@ iteration_statement
   		}else{
   			temp3->sttype=WHILE_STMT;
   			temp3->expr1=((assign_stmt *)$3)->rhs;
+        temp3->end_stmt = temp3;
   		}
   		((assign_stmt *)$3)->rhs->pflag=100;
   	}
@@ -1942,6 +1945,7 @@ iteration_statement
   			while(i<=cnt){i++;t2=t2->prev;}
 			  t2->next=temp3; 
 			  temp3->prev=t2;
+        temp3->end_stmt = temp3;
   		}
   		FUNCALL_FLAG=0;
     }
@@ -1975,6 +1979,7 @@ iteration_statement
   		  }
   			t2->next=temp3;
   			temp3->prev=t2;
+        temp3->end_stmt = temp3;
   		}
   		FUNCALL_FLAG=0;
   	}
@@ -2007,6 +2012,7 @@ iteration_statement
   			}
   			t2->next=temp3;
   			temp3->prev=t2;
+        temp3->end_stmt = temp3;
   		}
   		currsymtab=currsymtab->parent;
   		FUNCALL_FLAG=0;
@@ -2039,6 +2045,7 @@ iteration_statement
   			}
   			t2->next=temp3;
   			temp3->prev=t2;
+        temp3->end_stmt = temp3;
       }
     	currsymtab=currsymtab->parent;
     	FUNCALL_FLAG=0;
@@ -2080,7 +2087,7 @@ iteration_statement
         temp3->stassign=temp1->stassign;
         fnamescond[temp1->stassign->rhs->name]=temp3;
         temp3->prev->next=temp3;temp1=temp3;
-        
+        temp3->end_stmt = temp3;
         if(level_of_foreach == 1) foreach_list.push_back(temp3);
       }
     	currsymtab=currsymtab->parent;
@@ -2121,7 +2128,7 @@ iteration_statement
 			  temp3->stassign=temp1->stassign;
 			  temp3->prev->next=temp3;
 			  temp1=temp3;
-
+        temp3->end_stmt = temp3;
         if(level_of_foreach == 1) foreach_list.push_back(temp3);
 	    }
 	    currsymtab=currsymtab->parent;
@@ -2493,6 +2500,7 @@ int main(int argc, char *argv[]){
   strncpy(header,argv[1],t1+1);
   strncpy(gheader,argv[1],t1);
   strncpy(source,argv[1],t1+1);
+  bool cpuParallelSection = false;
   if(argc >2 ){
     //for all extra command line argument. option for partition size on cpu gpu has to be added.
     int temp=2;
@@ -2507,6 +2515,8 @@ int main(int argc, char *argv[]){
         CONVERT_VERTEX_EDGE = atoi(argv[temp+1]);
       } else if (!strcmp(argv[temp], "-gpu")) {
         isGPU = atoi(argv[temp+1]);
+      } else if(!strcmp(argv[temp], "-ps")) {
+        cpuParallelSection = atoi(argv[temp+1]);
       }
       temp=temp+2;
     }
@@ -2555,8 +2565,9 @@ int main(int argc, char *argv[]){
   if(isGPU) {
     insert_graph_node(); // insert GPU graph node;
     // convert_to_gpu(); // converts parameter of kernels to GPU variable type
-    get_variables();  // converts global variables
+    // get_variables();  // converts global variables
   }
+  get_variables(isGPU, cpuParallelSection);
 
   temp->print();
   setparent();

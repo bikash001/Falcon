@@ -314,12 +314,11 @@ void createifstmt(statement **t4ref,statement **t1ref,statement **t2ref,statemen
     return;
 
 }
-createsinglestmt(statement **t4ref,statement **t1ref,statement **t2ref,statement **temp3ref) {
+void createsinglestmt(statement **t4ref,statement **t1ref,statement **t2ref,statement **temp3ref) {
     statement *t4=(*t4ref);
     statement *t2=(*t2ref);
     statement *t1=(*t1ref);
     statement *temp3=(*temp3ref);
-    if(temp3==NULL)printf("HELLO\n");
     tree_expr *bar=t4->expr1;
     if(bar->expr_type==VAR && bar->libdtype==COLLECTION_TYPE)barrier=1;
     if(temp3->sttype==EBLOCK_STMT) {
@@ -369,7 +368,7 @@ createsinglestmt(statement **t4ref,statement **t1ref,statement **t2ref,statement
     }
     FUNCALL_FLAG=0;
 }
-createsinglestmt1(statement **t4ref,statement **t2ref,statement **temp3ref) {
+void createsinglestmt1(statement **t4ref,statement **t2ref,statement **temp3ref) {
     statement *t4=(*t4ref);
     statement *t2=(*t2ref);
     statement *temp3=(*temp3ref);
@@ -401,7 +400,7 @@ createsinglestmt1(statement **t4ref,statement **t2ref,statement **temp3ref) {
     }
     FUNCALL_FLAG=0;
 }
-initforeach(statement **t1ref,statement **temp3ref,char *name1,char *name2,int itr) {
+void initforeach(statement **t1ref,statement **temp3ref,char *name1,char *name2,int itr) {
     statement *t1=*t1ref;
     statement *temp3=*temp3ref;
     dir_decl *d1=currsymtab->findsymbol(name1);

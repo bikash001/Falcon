@@ -28,6 +28,7 @@ std::map<dir_decl*, statement*> fx_collections;
 struct comparator;
 static void walk_find_prop_util(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, assign_stmt *astmt, dir_decl *dg);
 static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, tree_decl_stmt *params, assign_stmt *args);
+static bool same_level(statement *start, statement *end, statement *goal);
 
 struct comparator
 {
@@ -1554,9 +1555,9 @@ static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, 
 static void check_null(map<dir_decl*, set<char*, comparator>*> &tab, int k)
 {
 	for(map<dir_decl*, set<char*, comparator>*>::iterator ii=tab.begin(); ii!=tab.end(); ++ii) {
-		if(ii->first == NULL || ii->first == 0x0) {
+		if(ii->first == NULL) {
 			printf("Error-104 %d\n", k);
-		} else if (ii->second == NULL || ii->second == 0x0) {
+		} else if (ii->second == NULL) {
 			printf("ERROR-105 %d\n", k);
 		}
 	}
@@ -1574,9 +1575,106 @@ static void print(map<dir_decl*, set<char*, comparator>*> &tab, string ss)
 	cout << "**************************" << endl;
 }
 
+static char* create_string(char *str) {
+	char* temp = malloc(sizeof(char)*(1+strlen(str)));
+	strcpy(temp, str);
+	return temp;
+}
+
+static statement* create_empty_stmt(int lineno) {
+	statement *stmt = new statement;
+	stmt->sttype = EMPTY_STMT;
+	stmt->lineno = lineno;
+	return stmt;
+}
+
+static void insert_parallel_section(vector<statement*> &kernels, int start, int end)
+{
+	int count = end - start;
+	statement *stmt = create_empty_stmt(2);
+	char *buff = new char[100];
+	snprintf(buff, 100, "#pragma omp sections num_threads(2) \n{\n#pragma omp section\n{\n");
+	stmt->name = create_string(buff);
+	insert_statement(kernels[start]->prev, stmt, kernels[start]);
+	for(int i=start+1; i<=end; ++i) {
+		stmt = create_empty_stmt(2);
+		snprintf(buff, 100, "}\n#pragma omp section\n{\n");
+		stmt->name = create_string(buff);
+		insert_statement(kernels[i-1], stmt, kernels[i-1]->next);
+	
+		if(i != end) {
+			stmt = create_empty_stmt(2);
+			snprintf(buff, 100, "#pragma omp sections num_threads(2)\n{\n#pragma omp section\n{\n");
+			stmt->name = create_string(buff);
+			insert_statement(kernels[i]->prev, stmt, kernels[i]);
+		}
+	}
+
+	stmt = create_empty_stmt(2);
+	if(4*(end-start)+1 > 100) {
+		delete[] buff;
+		buff = new char[4*(end-start)+1];
+	}
+	for(int i=0; i<end-start; ++i) {
+		sprintf(&buff[4*i], "}\n}\n");
+	}
+	// buff[2*(end-start)] = '\0';
+	stmt->name = create_string(buff);
+	insert_statement(kernels[end], stmt, kernels[end]->next);
+	delete[] buff;
+}
+
+static bool found(statement *stmt, statement *end, statement *goal)
+{
+	if(stmt->f1) {
+		return same_level(stmt->f1, end, goal);
+	}
+	if(stmt->f2) {
+		return same_level(stmt->f2, end, goal);
+	}
+	if(stmt->f3) {
+		return same_level(stmt->f3, end, goal);
+	}
+	return false;
+}
+
+static bool same_level(statement *start, statement *end, statement *goal)
+{
+	statement *curr = start;
+	while(curr && curr != end && curr != goal) {
+		switch(curr->sttype) {
+			case SINGLE_STMT:
+			case SWITCH_STMT:
+				if(found(curr, NULL, goal)) {
+					return false;
+				}
+				break;
+			case SECTIONS_STMT:
+			case SECTION_STMT:
+			case IF_STMT:
+			case WHILE_STMT:
+			case DOWHILE_STMT:
+			case FOR_STMT:
+			case FOREACH_STMT:
+				if(found(curr, curr->end_stmt, goal)) {
+					return false;
+				}
+				curr = curr->end_stmt;
+				break;
+			default:
+				break;
+		}
+		curr = curr->next;
+	}
+	if(curr == goal) {
+		return true;
+	} else {
+		return false;
+	}
+}
 
 // Finds global variables used in kernels
-void get_variables()
+void get_variables(bool isGPU, bool cpuParallelSection = false)
 {
 	std::set<dir_decl *> gset;	// keeps gpu global variables
 	map<dir_decl*, set<char*, comparator>*> rmap1, rmap2, wmap1, wmap2, *curr_rmap, *curr_wmap, *next_rmap, *next_wmap;
@@ -1592,12 +1690,14 @@ void get_variables()
 	next_rset = &rset2;
 	next_wset = &wset2;
 
+	vector<statement*> kernels;
 
 	for(int i=0; i<foreach_list.size(); ++i)
 	{
 		statement *stmt = foreach_list[i];
 
 		if(stmt->stassign) {
+			kernels.push_back(stmt);
 			char *name = stmt->stassign->rhs->name;
 			statement *target = get_function(name);
 			if(target == NULL) {
@@ -1708,7 +1808,31 @@ void get_variables()
 		foreach_list[foreach_list.size()-1]->comma = true;
 	}
 
-	for(set<dir_decl *>::iterator ii = gset.begin(); ii != gset.end(); ++ii) {
-		(*ii)->gpu = 1;
+	if(isGPU) {
+		for(set<dir_decl *>::iterator ii = gset.begin(); ii != gset.end(); ++ii) {
+			(*ii)->gpu = 1;
+		}
+	} else if(cpuParallelSection) {
+
+		statement *end;
+		if(kernels.size() > 0) {
+			end = function_end(kernels.back());
+		}
+
+		int count = 0;
+		for(int j=1; j<kernels.size(); ++j) {
+			if(kernels[j-1]->comma && same_level(kernels[j-1], NULL, kernels[j])) {
+				count++;
+			} else if(count > 0){
+				insert_parallel_section(kernels, j-1-count, j-1);
+				count = 0;
+			}
+			kernels[j-1]->comma = false;
+			
+		}
+		kernels.back()->comma = false;
+		if(count > 0) {
+			insert_parallel_section(kernels, kernels.size()-1-count, kernels.size()-1);
+		}
 	}
 }
