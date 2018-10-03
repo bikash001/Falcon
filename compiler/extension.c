@@ -7,6 +7,7 @@
 using namespace std;
 
 std::vector<statement*> foreach_list;
+std::vector<statement*> sections_stmts;
 extern char* libdtypenames[10];
 extern std::map<char*, statement*> fnames;
 extern std::map<char*, statement*> fnamescond;
@@ -1812,6 +1813,51 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 		for(set<dir_decl *>::iterator ii = gset.begin(); ii != gset.end(); ++ii) {
 			(*ii)->gpu = 1;
 		}
+
+
+		// generate multi-gpu code
+		set<dir_decl*> graphs;
+		int stream_no = 1;
+		vector<statement*>::iterator jj = kernels.begin();
+
+		for(vector<statement*>::iterator ii=sections_stmts.begin(); ii!=sections_stmts.end(); ++ii) {
+			// printf("-->%d\n", (*ii)->lineno);
+			int dev_no = 0;
+			statement *curr = (*ii)->next;
+			while(curr != (*ii)->end_stmt) {
+				if(curr->sttype != SECTION_STMT) {
+					fprintf(stderr, "%s %d\n", "SECTION not found", curr->lineno);
+					exit(1);
+				}
+
+				for(; jj!=kernels.end(); ++jj) {
+					if((*jj)->lineno > curr->end_stmt->lineno) {
+						break;
+					} else if((*jj)->lineno >= curr->lineno) {
+						assign_stmt *astmt = (*jj)->stassign->rhs->arglist;
+						while(astmt) {
+							if(astmt->rhs && astmt->rhs->expr_type == VAR && astmt->rhs->lhs->libdtype == GRAPH_TYPE) {
+								dir_decl *d = astmt->rhs->lhs;
+								if(graphs.find(d) == graphs.end()) {
+									graphs.insert(d);
+									if(dev_no > 0) {
+										d->dev_no = dev_no;
+									}
+									dev_no++;
+								} else {
+									(*jj)->stream_id = stream_no++;
+								}
+								break;
+							}
+							astmt = astmt->next;
+						}
+					}
+				}
+
+				curr = curr->end_stmt->next;
+			}
+		}
+
 	} else if(cpuParallelSection) {
 
 		statement *end;

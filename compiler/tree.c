@@ -2565,6 +2565,7 @@ statement::statement() {
     noprint=false;
     end_stmt=NULL;
     start_stmt=NULL;
+    stream_id = 0;
 }
 iter_stmt::iter_stmt() {
     expr1=NULL;

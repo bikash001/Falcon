@@ -895,16 +895,19 @@ void statement::codeGen(FILE *FP1) {
                                 if(this->stassign!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
                                     dir_decl *setvar=NULL;
                                     if(this->comma) {
-                                        if(stream_count > 0){
+                                        // if(stream_count > 0){
                                             char buff[20];
                                             snprintf(buff, 20, "_flcn_stream%d", stream_count++);
                                             fprintf(FP1,"cudaSetDevice(%d);\ncudaStream_t %s;\ncudaStreamCreate(&%s);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d,0,%s>>>(",
                                                 d2->dev_no, buff, buff, d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no, buff);
-                                        } else {
-                                            stream_count++;
-                                            fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
-                                        }
-                                    } else {
+                                        // } else {
+                                        //     stream_count++;
+                                        //     fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                        // }
+                                    } else if(this->stream_id > 0) {
+                                        fprintf(FP1,"cudaSetDevice(%d);\ncudaStream_t _flcn_pstream%d;\ncudaStreamCreate(&_flcn_pstream%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d,0,_flcn_pstream%d>>>(",
+                                            d2->dev_no, this->stream_id, this->stream_id, d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no, this->stream_id);
+                                    } else{
                                         fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
                                     }
                                     assign_stmt *ta=this->stassign->rhs->arglist;
@@ -1072,15 +1075,18 @@ void statement::codeGen(FILE *FP1) {
                         if(this->feb==0) {
                             if(this->stassign!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
                                 if(this->comma) {
-                                    if(stream_count > 0){
+                                    // if(stream_count > 0){
                                         char buff[20];
                                         snprintf(buff, 20, "_flcn_stream%d", stream_count++);
                                         fprintf(FP1,"cudaSetDevice(%d);\ncudaStream_t %s;\ncudaStreamCreate(&%s);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d,0,%s>>>(",
                                             d2->dev_no, buff, buff, d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no, buff);
-                                    } else {
-                                        stream_count++;
-                                        fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
-                                    }
+                                    // } else {
+                                    //     stream_count++;
+                                    //     fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
+                                    // }
+                                } else if(this->stream_id > 0) {
+                                    fprintf(FP1,"cudaSetDevice(%d);\ncudaStream_t _flcn_pstream%d;\ncudaStreamCreate(&_flcn_pstream%d);\nfor(int kk=0;kk<%s.npoints;kk+=%spointkernelblocks*TPB%d){ \n%s<<<%spointkernelblocks,TPB%d,0,_flcn_pstream%d>>>(",
+                                        d2->dev_no, this->stream_id, this->stream_id, d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no, this->stream_id);
                                 } else {
                                     fprintf(FP1,"cudaSetDevice(%d);\nfor(int kk=0;kk<%s.nedges;kk+=%sedgekernelblocks*TPB%d){ \n%s<<<%sedgekernelblocks,TPB%d>>>(",d2->dev_no,d2->name,d2->name,d2->dev_no,this->stassign->rhs->name,d2->name,d2->dev_no);
                                 }

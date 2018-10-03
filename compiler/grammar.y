@@ -86,6 +86,7 @@ extern std::map<dir_decl*, statement*> graph_insert_point;
 dir_decl *insert_point = NULL;
 extern void insert_graph_node();
 extern std::map<dir_decl*, statement*> fx_sets, fx_collections;
+extern std::vector<statement*> sections_stmts;
 
 %}
 %union {
@@ -141,7 +142,6 @@ extern std::map<dir_decl*, statement*> fx_sets, fx_collections;
 
 primary_expression
 	: IDENTIFIER {
-      //	printf("XX\n");
       dir_decl *x=currsymtab->findsymbol($1);
       $$=new tree_expr(x);
     	((tree_expr *)$$)->name=$1;
@@ -279,7 +279,6 @@ postfix_expression
         if(isGPU && t1->expr_type == STRUCTREF) {
           if(t1->lhs->lhs->libdtype == GRAPH_TYPE && strcmp(t1->rhs->name, "read") == 0) {
             insert_point = t1->lhs->lhs;
-            // printf("TEST %s\n", insert_point->name);
           }
         }
         t1=((tree_expr *)$1)->rhs;
@@ -329,11 +328,6 @@ postfix_expression
 	    $$=$1;
       if(t1->expr_type==STRUCTREF&&!(strcmp(t1->rhs->name,"addPointProperty"))){   
         adddynamicproperty(t1,P_P_TYPE,pt1);
-        // printf("--> %s\n", pt1->rhs->name);
-        // printf("-<> %s\n", ((tree_decl_stmt*)$5)->lhs->name);
-        // printf("TEST %s\n", pt1->rhs->lhs->name);
-        // printf("TEST %s %s\n", pt1->rhs->name, pt1->next->rhs->name);
-        // exit(0);
         graph_prop = pt1->rhs;
         parent_graph = t1->lhs->lhs;
         ext_decl_type = 1;
@@ -653,10 +647,6 @@ constant_expression
 
 declaration
 	: declaration_specifiers ';'{
-  		#ifdef DEBUGGING
-        printf("%s\n", "declaration-1");
-      #endif
-
       $$=createdeclstmt($1,NULL,NULL);
   		symtableentry *old=NULL;
   		if(((tree_typedecl *)$1)->datatype>9)currsymtab->addsymbol((dir_decl *)NULL,(tree_typedecl *)$1);
@@ -669,10 +659,6 @@ declaration
       ext_decl_type = -1;
 		}
 	| declaration_specifiers init_declarator_list ';'{
-  		#ifdef DEBUGGING
-        printf("%s\n", "declaration-2");
-      #endif
-
       symtableentry *old=NULL;
   		currsymtab->addsymbol((dir_decl *)$2,(tree_typedecl *)$1);
   		$$=createdeclstmt($1,NULL,$2);
@@ -701,10 +687,6 @@ declaration
       ext_decl_type = -1;
   	}
 	| static_assert_declaration{
-      #ifdef DEBUGGING
-        printf("%s\n", "declaration-3");
-      #endif
-
       $$=new symtableentry();
       ext_decl_type = -1;
     }
@@ -721,9 +703,6 @@ declaration_specifiers
   		t1->next=$2;
   		$$=$1;}
 	| type_specifier{
-      #ifdef DEBUGGING
-        printf("%s\n", "declaration_specifiers-4");
-      #endif
 		  $$=$1;
     }
 	| type_qualifier declaration_specifiers{
@@ -1597,57 +1576,27 @@ static_assert_declaration
 
 statement
 	: labeled_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-1");
-      #endif
       $$=new tree_node();}
 	| compound_statement{
-		  #ifdef DEBUGGING
-        printf("%s\n", "statement-2");
-      #endif
       $$=sblock_begin[sbtop];
 	  }
 	| expression_statement{
-		  #ifdef DEBUGGING
-        printf("%s\n", "statement-3");
-      #endif
       $$=$1;
 	  }
 	| selection_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-4");
-      #endif
       $$=new tree_node();((tree_node *)$$)->nodetype=TREE_IF;}
 	| single_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-5");
-      #endif
       $$=new tree_node();}
 	| iteration_statement{
-		  #ifdef DEBUGGING
-        printf("%s\n", "statement-6");
-      #endif
       $$=new tree_node() ;
 	  }
 	| jump_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-7");
-      #endif
       $$=new tree_node();}
   | parallel_statement {
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-8");
-      #endif      
     }
   | macro_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-9");
-      #endif
       $$=$1;  }
   | error {
-      #ifdef DEBUGGING
-        printf("%s\n", "statement-10");
-      #endif
       $$=new tree_node();}
 	;
 
@@ -1656,6 +1605,7 @@ parallel_statement
   		$3=sblock_begin[sbtop];
   	  ((statement *)$3)->sttype=SECTIONS_STMT;
       ((statement *)$3)->end_stmt = temp3;
+      sections_stmts.push_back((statement*)$3);
     }
 	;
 
@@ -1789,10 +1739,6 @@ b_compound_begin
 
 block_item_list
 	: block_item {
-  		#ifdef DEBUGGING
-        printf("%s\n", "block_item_list-1");
-      #endif
-      
       if(temp==NULL){
   			G1=temp1;
   			flag=1;
@@ -1804,9 +1750,6 @@ block_item_list
       }
   	}
 	| block_item_list block_item {
-      #ifdef DEBUGGING
-        printf("%s\n", "block_item_list-2");
-      #endif
       /*((statement *)$1)->next=$2;*/
       $$=$2;
     }
@@ -1814,14 +1757,8 @@ block_item_list
 
 block_item
 	: declaration {
-      #ifdef DEBUGGING
-        printf("%s\n", "block-item-1");
-      #endif
       $$=$1;}
 	| statement {
-      #ifdef DEBUGGING
-        printf("%s\n", "block-item-2");
-      #endif
       $$=$1;}
 	;
 
@@ -2248,14 +2185,8 @@ conditional_for: '('expression ')'  statement{  }
 
 translation_unit
 	: external_declaration{$$=$1; 
-      #ifdef DEBUGGING
-        printf("%s\n", "translation_unit-1");
-      #endif
     }
 	| translation_unit external_declaration{$$=$2;
-      #ifdef DEBUGGING
-        printf("%s\n", "translation_unit-2");
-      #endif
     }
 	;
 
@@ -2267,29 +2198,15 @@ external_declaration
   		fnames[t1->prev->stdecl->dirrhs->name]=t1->prev;
       t1->prev->foreachflag=FOREACH_FUN_FLAG;
       FOREACH_FUN_FLAG=0;
-  
-      #ifdef DEBUGGING
-        printf("%s\n", "external_declaration-1");
-      #endif
 	  }
 	| declaration{
-      #ifdef DEBUGGING
-        printf("%s\n", "external_declaration-2");
-      #endif
     }
   | macro_statement{ 
-      #ifdef DEBUGGING
-        printf("%s\n", "external_declaration-3");
-      #endif
     }
 	;
 
 function_definition
 	: declaration_specifiers declarator declaration_list{de2=temp3;} compound_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "function_definition-1");
-      #endif
-
 		  if(temp3->sttype==EBLOCK_STMT)
   		  temp3->sttype=FUNCTION_EBLOCK_STMT;
   		statement *t1=new statement();
@@ -2308,10 +2225,6 @@ function_definition
       t1->end_stmt = temp3;
     }
 	| declaration_specifiers declarator compound_statement{
-  		#ifdef DEBUGGING
-        printf("%s\n", "function_definition-2");
-      #endif
-
       statement *t1=new statement();
 
   		temp3->sttype=FUNCTION_EBLOCK_STMT;
@@ -2391,10 +2304,6 @@ function_definition
       t1->end_stmt = temp3;
     }
 	| declarator declaration_list{de2=temp3;} compound_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "function_definition-3");
-      #endif
-
   		temp3->sttype=FUNCTION_EBLOCK_STMT;
   		((dir_decl *)$1)->procd=1;
   		statement *t1=new statement();
@@ -2414,16 +2323,8 @@ function_definition
   		t2->prev=de2;
   		t1->lineno=LINENO;
       t1->end_stmt = temp3;
-      #ifdef DEBUGGING
-        printf("%s\n", "function_definition-3");
-      #endif
-
   	}
 	| declarator compound_statement{
-      #ifdef DEBUGGING
-        printf("%s\n", "function_definition-4");
-      #endif
-
   		statement *t1=new statement();
   		temp3->sttype=FUNCTION_EBLOCK_STMT;
   		if(barrier==1){
@@ -2455,15 +2356,9 @@ declaration_list
 	: declaration {
       de1=temp3;
       $$=$1;
-      #ifdef DEBUGGING
-        printf("%s\n", "declaration_list-1");
-      #endif
     }
 	| declaration_list declaration {
       $$=$1;
-      #ifdef DEBUGGING
-        printf("%s\n", "declaration_list-1");
-      #endif
     }
 	;
 
@@ -2578,16 +2473,10 @@ int main(int argc, char *argv[]){
     exit(0);
   }
 
-
   if(CONVERT_VERTEX_EDGE) {
     // falcon extension code
     convert_vertex_edge();
   }
-
-
-  #ifdef DEBUGGING
-    printf("%s\n", "\n***********************\n****parse completed****\n***********************\n");
-  #endif
 
   temp->codeGen1();
   for(int ii=1;ii<TOT_GPU_GRAPH;ii++)fprintf(FP,"cudaDeviceProp prop%d;\n",ii);

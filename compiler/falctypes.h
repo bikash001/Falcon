@@ -522,6 +522,7 @@ public:
     bool feb;
     class statement *end_stmt; // end statement of function, loop, if, switch
     class statement *start_stmt; // start statement of a loop-block
+    int stream_id; // used in parrallel sections to set stream no used in gpu
     print();
     void codeGen(FILE *FP);
     void codeGen1();
