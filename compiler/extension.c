@@ -164,7 +164,7 @@ void convert_vertex_edge()
 				statement *next_stmt = target->next;	//FOREACH_STMT
 				tree_decl_stmt *params = target->prev->stdecl->dirrhs->params;
 				dir_decl *graph = NULL;
-				struct extra_ppts *ppts = NULL;
+				extra_ppts *ppts = NULL;
 				dir_decl *d = NULL;
 
 				while(params) {
@@ -316,7 +316,7 @@ void convert_vertex_edge()
 
         	// change parameter
         	tree_decl_stmt *params = function->stdecl->dirrhs->params;
-			struct extra_ppts *ppts = NULL;
+			extra_ppts *ppts = NULL;
 			dir_decl *point = NULL;		// new parameter of Point type
 			dir_decl *edge = NULL;	// old parameter of Edge type
 			while(params) {
@@ -1200,7 +1200,7 @@ static void get_property(char **type_ptr, char *size_ptr, statement *stmt)
 {
 	tree_expr *t1 = stmt->stassign->rhs;
 	dir_decl *parent = t1->lhs->lhs;
-	struct extra_ppts *ep = parent->ppts;
+	extra_ppts *ep = parent->ppts;
 	assign_stmt *pt1 = t1->rhs->arglist;
 	
 	while(ep) {
@@ -1237,12 +1237,20 @@ static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<
 		map<dir_decl*, set<char*, comparator> > gps;	// gpu graph and its attributes
 		for(set<char*, comparator>::iterator ii=v.begin(); ii!=v.end(); ++ii) {
 			dir_decl *d = find_var(tab[it->first], *ii);
-			if(d != NULL) {
+			if(d != NULL && d != it->first) {
 				if(gps.find(d) == gps.end()) {
 					gps.insert(pair<dir_decl*, set<char*, comparator> >(d, set<char*, comparator>()));
 				}
 				gps[d].insert(*ii);
+
 			}
+
+			// store these attributes in cpu copy as we need to allocate memory
+			map<dir_decl*, set<char*, comparator> > &tmp = tab[it->first];
+			if(tmp.find(it->first) == tmp.end()) {
+				tmp.insert(pair<dir_decl*, set<char*, comparator> >(it->first, set<char*, comparator>()));
+			}
+			tmp[it->first].insert(*ii);
 		}
 
 		for(map<dir_decl*, set<char*, comparator> >::iterator jj=gps.begin(); jj!=gps.end(); ++jj) {
@@ -1482,7 +1490,7 @@ static void copy_graph_properties(dir_decl *dg, dir_decl *new_graph, set<char*, 
       while(oldppts){
         if(attrs.find(oldppts->name) != attrs.end()) {
 	        if(newppts == NULL) {
-				newppts=malloc(sizeof(struct extra_ppts));
+				newppts = new extra_ppts();
 				newppts->parent=NULL;
 				newppts->name=malloc(sizeof(char)*100);
 				strncpy(newppts->name,oldppts->name,strlen(oldppts->name));
@@ -1496,7 +1504,7 @@ static void copy_graph_properties(dir_decl *dg, dir_decl *new_graph, set<char*, 
 				newppts->parent=dg;
 				head=newppts;
 	        } else {
-		        newppts->next=malloc(sizeof(struct extra_ppts));
+		        newppts->next= new extra_ppts();
 		        newppts=newppts->next;
 		        newppts->parent=NULL;
 		        newppts->name=malloc(sizeof(char)*100);
@@ -1685,14 +1693,43 @@ static void insert_graph_node(map<dir_decl*, map<dir_decl*, set<char*, comparato
 	// replace_graphs(tab);	// replace cpu graph by its gpu copy in each stmt following its declaration
 	// tab.clear();
 	if(end != NULL) {
-		vector<pair<tree_expr*, char*> > v;
+		vector<pair<tree_expr*, char*> > v;	// stores <graph, attribute_name> pair
 		set<statement*> visited;
 		find_var_prop_pair(end, visited, v, tab);
 
+		// replace all uses of cpu graph with gpu graphs which contains the attributes used here
 		for(vector<pair<tree_expr*, char*> >::iterator ii=v.begin(); ii!=v.end(); ++ii) {
 			dir_decl *d = find_var(tab.find(ii->first->lhs)->second, ii->second);
-			if(d != NULL) {
+
+			// if no gpu graph uses this attribute, store it in cpu_graph set. This cpu_graph set contains all attributes which had to have memory in cpu
+			if(d == NULL) {	
+				map<dir_decl*, set<char*, comparator> > &mp = tab[ii->first->lhs];
+				if(mp.find(ii->first) == mp.end()) {	// keep track of the attributes which has to have memory in cpu
+					mp.insert(pair<dir_decl*, set<char*, comparator> >(ii->first->lhs, set<char*, comparator>()));
+				}
+				mp[ii->first->lhs].insert(ii->second);
+			} else if(d != ii->first->lhs){ // if gpu graph found, replace the cpu graph with this graph
 				ii->first->lhs = d;
+			}
+		}
+	}
+
+	// remove cpu attributes not required.
+	for(map<dir_decl*, map<dir_decl*, set<char*, comparator> > >::iterator ii=tab.begin(); ii!=tab.end(); ++ii) {
+		map<dir_decl*, set<char*, comparator> >::iterator jj = ii->second.find(ii->first);
+		if(jj != ii->second.end()) {
+			extra_ppts *ppts = jj->first->ppts;
+			while(ppts) {
+				if(jj->second.find(ppts->name) == jj->second.end()) {
+					ppts->mem_allocate = false;
+				}
+				ppts = ppts->next;
+			}
+		} else {
+			extra_ppts *ppts = jj->first->ppts;
+			while(ppts) {
+				ppts = ppts->next;
+				ppts->mem_allocate = false;
 			}
 		}
 	}

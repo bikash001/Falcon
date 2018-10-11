@@ -381,9 +381,9 @@ postfix_expression
         strcpy(tp1->name,libdtypenames[tp1->libdatatype]);
         if(dg->ppts!=NULL){
           extra_ppts *newppts,*oldppts=dg->ppts,*head;
-          newppts=malloc(sizeof(struct extra_ppts));
+          newppts =  new extra_ppts();
           newppts->parent=NULL;
-          newppts->name=malloc(sizeof(char)*100);
+          newppts->name = malloc(sizeof(char)*100);
           strncpy(newppts->name,oldppts->name,strlen(oldppts->name));
           newppts->libdtype=oldppts->libdtype;
           newppts->t1=oldppts->t1;//mutliple entries point to same type
@@ -398,7 +398,7 @@ postfix_expression
           head=newppts;
           oldppts=oldppts->next;
           while(oldppts){
-            newppts->next=malloc(sizeof(struct extra_ppts));
+            newppts->next= new extra_ppts();
             newppts=newppts->next;
             newppts->parent=NULL;
             newppts->name=malloc(sizeof(char)*100);

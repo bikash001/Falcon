@@ -784,27 +784,29 @@ void statement::codeGen(FILE *FP1) {
                             }
                             while(ep!=NULL) {
                                 if(t1->gpu==0) {
-                                    if(ep->t1->libdatatype==E_P_TYPE ) {
-                                        fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * %s.nedges%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->name,morphalloc_string[morph_size]);
-                                    }
-                                    if(ep->t1->libdatatype==P_P_TYPE) {
-                                        fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * %s.npoints%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->name,morphalloc_string[morph_size]);
-                                    }
-                                    if(ep->t1->libdatatype==G_P_TYPE) {
-                                        if(ep->val2!=-1) {
-                                            fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * ((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
-                                            fprintf(FP,"%*s""((%s *)%s.extra)->owner=(int *)malloc(sizeof(int)*((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
+                                    if(ep->mem_allocate) {
+                                        if(ep->t1->libdatatype==E_P_TYPE ) {
+                                            fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * %s.nedges%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->name,morphalloc_string[morph_size]);
                                         }
-                                        else {
-                                            fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * ((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
-                                            fprintf(FP,"%*s""((%s *)%s.extra)->owner=(int *)malloc(sizeof(int)*((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
+                                        if(ep->t1->libdatatype==P_P_TYPE) {
+                                            fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * %s.npoints%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->name,morphalloc_string[morph_size]);
+                                        }
+                                        if(ep->t1->libdatatype==G_P_TYPE) {
+                                            if(ep->val2!=-1) {
+                                                fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * ((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
+                                                fprintf(FP,"%*s""((%s *)%s.extra)->owner=(int *)malloc(sizeof(int)*((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
+                                            }
+                                            else {
+                                                fprintf(FP,"%*s""((%s *)%s.extra)->%s=(%s *)malloc(sizeof(%s) * ((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,ep->name,ep->t1->name,ep->t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
+                                                fprintf(FP,"%*s""((%s *)%s.extra)->owner=(int *)malloc(sizeof(int)*((%s *)(%s.extra))->n%s%s) ;\n",indent," ",t1->extra_name,t1->name,t1->extra_name,t1->name,ep->name,morphalloc_string[morph_size]);
+
+                                            }
+                                        }
+                                        if(ep->t1->libdatatype==G_P_TYPE) {
+
+                                            fprintf(fp1," int falc%s%s;\n  int pn%s%s;\n  int max%s%s;\n",t1->name,ep->name,t1->name,ep->name,t1->name,ep->name);
 
                                         }
-                                    }
-                                    if(ep->t1->libdatatype==G_P_TYPE) {
-
-                                        fprintf(fp1," int falc%s%s;\n  int pn%s%s;\n  int max%s%s;\n",t1->name,ep->name,t1->name,ep->name,t1->name,ep->name);
-
                                     }
                                 }
                                 else {

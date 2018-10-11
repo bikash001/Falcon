@@ -192,6 +192,16 @@ struct extra_ppts {
     struct extra_ppts *next,*child;
     LIBDATATYPE  libdtype;
     int partfun;
+    bool mem_allocate; // set if memory to be allocated for this attribute
+
+    extra_ppts() {
+        t1 = NULL;
+        dt1 = NULL;
+        var1 = var2 = parent = var3 = NULL;
+        name = NULL;
+        next = child = NULL;
+        mem_allocate = true;
+    }
 };
 class dir_decl: public tree_node { //node for variable
 public:

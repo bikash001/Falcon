@@ -7,7 +7,7 @@ CFLAGS=  -w -fpermissive -std=c++03
 # 	lex lex.l
 # 	yacc -d grammar.y
 # 	$(CC) -g -I$(MYINCLUDES) $(CFLAGS) $(SOURCE) -o $(MYPROGRAM) 
-DEPS = externs.h symtab.h falctypes.h symtabold.h tree.h codegen.h
+DEPS = externs.h symtab.h falctypes.h symtabold.h tree.h codegen.h grammar.h
 
 ODIR=obj
 _OBJ = symtab.o codegen.o tree.o astprint.o y.tab.o lex.yy.o aux.o extension.o

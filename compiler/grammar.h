@@ -19,7 +19,7 @@ tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int n
 }
 inline void  adddynamicproperty(tree_expr *t1, enum LIBDATATYPE x,assign_stmt *pt1) {
 
-    struct extra_ppts *ep=malloc(sizeof(struct extra_ppts));
+    struct extra_ppts *ep= new extra_ppts();
     ep->parent=NULL;
     tree_typedecl *tt1=new tree_typedecl();
     tt1->libdatatype=x;
@@ -54,7 +54,7 @@ inline void  adddynamicproperty(tree_expr *t1, enum LIBDATATYPE x,assign_stmt *p
     symtableentry *old=NULL;
     currsymtab->addsymbol((dir_decl *)var,(tree_typedecl *)tt1);
     if(dpar!=NULL) {
-        struct extra_ppts *ep=malloc(sizeof(struct extra_ppts));
+        struct extra_ppts *ep= new extra_ppts();
         ep->parent=NULL;
         ep->child=NULL;
         tree_typedecl *tt1=new tree_typedecl();
@@ -75,7 +75,7 @@ inline void  adddynamicproperty(tree_expr *t1, enum LIBDATATYPE x,assign_stmt *p
 void addgraphproperty(tree_expr *t1, enum LIBDATATYPE x, assign_stmt *pt1) {
 
 
-    struct extra_ppts *ep=malloc(sizeof(struct extra_ppts));
+    struct extra_ppts *ep= new extra_ppts();
     ep->parent=NULL;
     tree_typedecl *tt1=new tree_typedecl();
     tt1->libdatatype=x;
