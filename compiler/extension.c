@@ -27,9 +27,13 @@ std::map<dir_decl*, statement*> fx_sets;
 //stores collection declaration
 std::map<dir_decl*, statement*> fx_collections;
 struct comparator;
-static void walk_find_prop_util(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, assign_stmt *astmt, dir_decl *dg);
-static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, tree_decl_stmt *params, assign_stmt *args);
+static void walk_find_prop_util(map<dir_decl*, set<char*, comparator> > &rmp, map<dir_decl*, set<char*, comparator> > &wmp, assign_stmt *astmt, dir_decl *dg);
+static void replace_map_variables(map<dir_decl*, set<char*, comparator> > &tab, tree_decl_stmt *params, assign_stmt *args);
 static bool same_level(statement *start, statement *end, statement *goal);
+static char* create_string(char *str);
+static statement* function_end(statement *stmt);
+static dir_decl* find_var(map<dir_decl*, set<char*, comparator> > &mp, char *cc);
+static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab, statement *temp);
 
 struct comparator
 {
@@ -442,6 +446,54 @@ void convert_vertex_edge()
 	}
 }
 
+
+static void change_cpu_graph(statement *forstmt, dir_decl *gpu_graph)
+{
+	forstmt->expr2->lhs = gpu_graph;		// replace cpu graph by gpu graph
+	forstmt->expr2->name = gpu_graph->name;
+
+	statement *target = get_function(forstmt->stassign->rhs->name);
+	if(target == NULL) {
+		fprintf(stderr, "Error: function %s not defined.\n", forstmt->stassign->rhs->name);
+		exit(0);
+	}
+	target->ker = 1;	// set function to kernel
+
+	// change arguments passed while calling kernel
+	assign_stmt *arglist = forstmt->stassign->rhs->arglist;
+	while(arglist) {
+		if(arglist->rhs->lhs->libdtype == GRAPH_TYPE) {
+			arglist->rhs->lhs = gpu_graph;
+			arglist->rhs->name = malloc(sizeof(char)*(1+strlen(gpu_graph->name)));
+			strcpy(arglist->rhs->name, gpu_graph->name);
+			// arglist->rhs->name = gpu_graph->name;
+			break;
+		} else if(arglist->rhs->lhs->it >= 0) {
+			arglist->rhs->lhs->parent = gpu_graph;
+		}
+		arglist = arglist->next;
+	}
+
+	// change parameters of kernel
+	tree_decl_stmt *params = target->stdecl->dirrhs->params;
+	
+	while(params) {
+		tree_typedecl *type = params->lhs;
+		while(type) {
+			// graph, point or edge
+			if (type->libdatatype >= 0 && type->libdatatype <= 4) {
+				params->dirrhs->gpu = 1;
+				// if(type->libdatatype == 0) {
+				// 	params->dirrhs->ppts = gpu_graph->ppts;
+				// }
+				break;
+			}
+			type = type->next;
+		}
+		params = params->next;
+	}
+}
+
 // Replaces cpu graphs by gpu graphs in foreach-statement and converts function 
 // parameters to gpu type.
 static void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
@@ -451,50 +503,8 @@ static void convert_to_gpu(map<dir_decl*, dir_decl*> &tab)
 		statement *forstmt = *ii;
 		
 		if(forstmt->stassign) {
-			dir_decl *parent_graph = tab.find(forstmt->expr2->lhs)->second;
-			forstmt->expr2->lhs = parent_graph;		// replace cpu graph by gpu graph
-			forstmt->expr2->name = parent_graph->name;
-
-			statement *target = get_function(forstmt->stassign->rhs->name);
-			if(target == NULL) {
-				fprintf(stderr, "Error: function %s not defined.\n", forstmt->stassign->rhs->name);
-				exit(0);
-			}
-			target->ker = 1;	// set function to kernel
-
-			// change arguments passed while calling kernel
-			assign_stmt *arglist = forstmt->stassign->rhs->arglist;
-			while(arglist) {
-				if(arglist->rhs->lhs->libdtype == GRAPH_TYPE) {
-					arglist->rhs->lhs = parent_graph;
-					arglist->rhs->name = malloc(sizeof(char)*(1+strlen(parent_graph->name)));
-					strcpy(arglist->rhs->name, parent_graph->name);
-					// arglist->rhs->name = parent_graph->name;
-					break;
-				} else if(arglist->rhs->lhs->it >= 0) {
-					arglist->rhs->lhs->parent = parent_graph;
-				}
-				arglist = arglist->next;
-			}
-
-			// change parameters of kernel
-			tree_decl_stmt *params = target->stdecl->dirrhs->params;
-			
-			while(params) {
-				tree_typedecl *type = params->lhs;
-				while(type) {
-					// graph, point or edge
-					if (type->libdatatype >= 0 && type->libdatatype <= 4) {
-						params->dirrhs->gpu = 1;
-						// if(type->libdatatype == 0) {
-						// 	params->dirrhs->ppts = parent_graph->ppts;
-						// }
-						break;
-					}
-					type = type->next;
-				}
-				params = params->next;
-			}
+			dir_decl *gpu_graph = tab.find(forstmt->expr2->lhs)->second;
+			change_cpu_graph(forstmt, gpu_graph);
 		}		
 	}
 }
@@ -767,7 +777,7 @@ static dir_decl* parent_graph(dir_decl *dd)
 }
 
 // Walks through expression to find what attributes are used
-static void walk_find_prop(map<dir_decl*, set<char*, comparator>*> &mp, tree_expr *expr, dir_decl *dg)
+static void walk_find_prop(map<dir_decl*, set<char*, comparator> > &mp, tree_expr *expr, dir_decl *dg)
 {
 	if(expr == NULL || expr->expr_type == VAR) {
 		return;
@@ -778,14 +788,14 @@ static void walk_find_prop(map<dir_decl*, set<char*, comparator>*> &mp, tree_exp
 			if(expr->lhs->rhs->expr_type == ARRREF) {
 				if(expr->rhs->expr_type == VAR) {
 					dir_decl *temp = expr->lhs->lhs->lhs;
-					map<dir_decl*, set<char*, comparator>*>::iterator itr = mp.find(temp);
+					map<dir_decl*, set<char*, comparator> >::iterator itr = mp.find(temp);
 					if(itr == mp.end()) {
-						set<char*, comparator> *v = new set<char*, comparator>();
-						mp[temp] = v;
+						// set<char*, comparator> *v = new set<char*, comparator>();
+						mp.insert(pair<dir_decl*, set<char*, comparator> >(temp, set<char*, comparator>()));
+						// mp[temp] = v;
 						// printf("TEST-4 %s %S\n", expr->lhs->name, expr->rhs->name);
 					}
-					set<char*, comparator> *v = mp[temp];
-					v->insert(expr->rhs->name);
+					mp[temp].insert(expr->rhs->name);
 				}
 			}
 		} else {
@@ -813,14 +823,16 @@ static void walk_find_prop(map<dir_decl*, set<char*, comparator>*> &mp, tree_exp
 					isLib = is_lib_attr(EDGE_TYPE, name);
 				}
 				if(!isLib) {
-					map<dir_decl*, set<char*, comparator>*>::iterator itr = mp.find(temp);
+					map<dir_decl*, set<char*, comparator> >::iterator itr = mp.find(temp);
 					if(itr == mp.end()) {
-						set<char*, comparator> *v = new set<char*, comparator>();
-						mp[temp] = v;
+						// set<char*, comparator> *v = new set<char*, comparator>();
+						mp.insert(pair<dir_decl*, set<char*, comparator> >(temp, set<char*, comparator>()));
+						// mp[temp] = v;
 						// printf("TEST-4 %s %S\n", expr->lhs->name, expr->rhs->name);
 					}
-					set<char*, comparator> *v = mp[temp];
-					v->insert(expr->rhs->name);
+					// set<char*, comparator> *v = mp[temp];
+					// v->insert(expr->rhs->name);
+					mp[temp].insert(expr->rhs->name);
 				}
 			}
 		}
@@ -861,6 +873,73 @@ static void walk_find_prop(map<dir_decl*, set<char*, comparator>*> &mp, tree_exp
 	}
 }
 
+// Walks through expression to find what attributes are used
+static void walk_find_var_prop_pair(tree_expr *expr, vector<pair<tree_expr*, char*> > &attr_pair)
+{
+	if(expr == NULL || expr->expr_type == VAR) {
+		return;
+	}
+	if(expr->expr_type == STRUCTREF && expr->lhs->expr_type == STRUCTREF) {
+		// printf("TEST-3 %s\n", expr->rhs->name);
+		if(expr->lhs->lhs->expr_type == VAR && expr->lhs->lhs->lhs->libdtype == GRAPH_TYPE) {
+			if(expr->lhs->rhs->expr_type == ARRREF) {
+				if(expr->rhs->expr_type == VAR) {
+					attr_pair.push_back(pair<tree_expr*, char*>(expr->lhs->lhs, expr->rhs->name));
+				}
+			}
+		} else {
+			walk_find_var_prop_pair(expr->lhs, attr_pair);
+			// walk_find_prop(mp, expr->rhs);
+		}
+	} else if(expr->expr_type == STRUCTREF && expr->lhs->expr_type == VAR) {
+		// printf("TEST-1 %s %d\n", expr->lhs->lhs->name, expr->lhs->lhs->libdtype);
+		dir_decl *dd = expr->lhs->lhs;
+		LIBDATATYPE type = expr->lhs->lhs->libdtype;
+		if(type == POINT_TYPE || type == EDGE_TYPE || (type == ITERATOR_TYPE && (dd->it >= 2 && dd->it <= 4))) {
+			// printf("TEST-2\n");
+			if(expr->rhs->expr_type == VAR) {
+				// printf("TEST <--> %s\n", expr->rhs->name);
+				
+			}
+		}
+	} else {
+		if(expr->lhs) {
+			walk_find_var_prop_pair(expr->lhs, attr_pair);
+		}
+		if(expr->rhs) {
+			walk_find_var_prop_pair(expr->rhs, attr_pair);
+		}
+		if(expr->earr_list) {
+			assign_stmt *astmt = expr->earr_list;
+			while(astmt) {
+				if(astmt->lhs) { // perhaps this is not required here since only read
+					walk_find_var_prop_pair(astmt->lhs, attr_pair);
+				}
+				if(astmt->rhs) {
+					walk_find_var_prop_pair(astmt->rhs, attr_pair);
+				}
+				astmt = astmt->next;
+			}
+		}
+		if(expr->next) {
+			walk_find_var_prop_pair(expr->next, attr_pair);
+		}
+		if(expr->arglist) {
+			assign_stmt *astmt = expr->arglist;
+			while(astmt) {
+				if(astmt->lhs) { // perhaps this is not required here since only read
+					walk_find_var_prop_pair(astmt->lhs, attr_pair);
+				}
+				if(astmt->rhs) {
+					walk_find_var_prop_pair(astmt->rhs, attr_pair);
+				}
+				astmt = astmt->next;
+			}
+		}
+	}
+}
+
+
 static void walk_util(dir_decl *old_decl, dir_decl *new_decl, statement *stmt)
 {
 	assign_stmt *astmt = stmt->stassign;
@@ -875,7 +954,7 @@ static void walk_util(dir_decl *old_decl, dir_decl *new_decl, statement *stmt)
 	}
 }
 
-static void walk_find_prop_util(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, assign_stmt *astmt, dir_decl *dg)
+static void walk_find_prop_util(map<dir_decl*, set<char*, comparator> > &rmp, map<dir_decl*, set<char*, comparator> > &wmp, assign_stmt *astmt, dir_decl *dg)
 {
 	while(astmt) {	
 		if(astmt->lhs) {
@@ -888,8 +967,22 @@ static void walk_find_prop_util(map<dir_decl*, set<char*, comparator>*> &rmp, ma
 	}
 }
 
+static void walk_find_var_prop_pair_util(assign_stmt *astmt, vector<pair<tree_expr*, char*> > &attr_pair,
+	map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab)
+{
+	while(astmt) {	
+		if(astmt->lhs) {
+			walk_find_var_prop_pair(astmt->lhs, attr_pair);
+		}
+		if(astmt->rhs) {
+			walk_find_var_prop_pair(astmt->rhs, attr_pair);
+		}
+		astmt = astmt->next;
+	}
+}
+
 // @params dg: default graph to be used if parent of point or edge is not set
-static void find_properties(map<dir_decl*, set<char*, comparator>*> &rmp, map<dir_decl*, set<char*, comparator>*> &wmp, statement *begin, statement *end, dir_decl *dg, set<statement*> &visited)
+static void find_properties(map<dir_decl*, set<char*, comparator> > &rmp, map<dir_decl*, set<char*, comparator> > &wmp, statement *begin, statement *end, dir_decl *dg, set<statement*> &visited)
 {
 	while(begin && (begin != end)) {
 		if(visited.find(begin) != visited.end()) {
@@ -981,6 +1074,116 @@ static void find_properties(map<dir_decl*, set<char*, comparator>*> &rmp, map<di
 	}
 }
 
+// @params dg: default graph to be used if parent of point or edge is not set
+static void find_var_prop_pair(statement *begin, set<statement*> &visited, vector<pair<tree_expr*, char*> > &attr_pair, 
+	map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab)
+{
+	while(begin && begin->sttype != FUNCTION_EBLOCK_STMT) {
+		if(visited.find(begin) != visited.end()) {
+			return;
+		} else {
+			visited.insert(begin);
+		}
+		if(begin->sttype == DECL_STMT) {
+			dir_decl *expr = begin->stdecl->dirrhs;
+			while(expr) {
+				if(expr->rhs) { // only check rhs, since lhs is being defined (i.e. local variable)
+					walk_find_var_prop_pair(expr->rhs, attr_pair);
+				}
+				expr = expr->nextv;
+			}
+		} else if(begin->sttype == FOR_STMT) {
+			if(!(begin->prev && (begin->prev->sttype == EMPTY_STMT) && (begin->prev->lineno==2))) {
+				// code for copying memory from gpu to cpu.
+				map<dir_decl*, set<char*, comparator> > rmp, wmp;
+				set<statement*> v;
+				find_properties(rmp, wmp, begin, begin->end_stmt, NULL, v);
+
+				statement *temp = new statement();
+				temp->sttype = EMPTY_STMT;
+				temp->lineno = 2;
+
+				temp->prev = begin->prev;
+				temp->next = begin;
+				begin->prev->next = temp;
+				begin->prev = temp;
+				
+				gencode_properties(rmp, tab, temp);
+				gencode_properties(wmp, tab, temp);
+			}
+			begin = begin->end_stmt;
+		} else if(begin->sttype == ASSIGN_STMT) {
+			walk_find_var_prop_pair_util(begin->stassign, attr_pair, tab);
+		} else if(begin->sttype != FOREACH_STMT) {
+			if(begin->expr1) {
+				walk_find_var_prop_pair(begin->expr1, attr_pair);
+			}
+			if(begin->expr2) {
+				walk_find_var_prop_pair(begin->expr2, attr_pair);
+			}
+			if(begin->expr3) {
+				walk_find_var_prop_pair(begin->expr3, attr_pair);
+			}
+			if(begin->expr4) {
+				walk_find_var_prop_pair(begin->expr4, attr_pair);
+			}
+			if(begin->expr5) {
+				walk_find_var_prop_pair(begin->expr5, attr_pair);
+			}				
+			if(begin->f1) {
+				find_var_prop_pair(begin->f1, visited, attr_pair, tab);
+			}
+			if(begin->f2) {
+				find_var_prop_pair(begin->f2, visited, attr_pair, tab);
+			}
+			if(begin->f3) {
+				find_var_prop_pair(begin->f3, visited, attr_pair, tab);
+			}
+		} else {
+			if(begin->expr4) {	// condition of foreach
+				walk_find_var_prop_pair(begin->expr4, attr_pair);
+			}
+			if(begin->stassign) { // function call
+				assign_stmt *astmt = begin->stassign;
+				if(astmt->lhs) {
+					walk_find_var_prop_pair(astmt->lhs, attr_pair);
+				}
+				if(astmt->rhs) {
+					assign_stmt *arglist = begin->stassign->rhs->arglist;
+					walk_find_var_prop_pair_util(arglist, attr_pair, tab);
+
+					if(astmt->rhs->expr_type == FUNCALL) {
+						// printf("TEST-590 %s\n", astmt->rhs->name);
+
+						statement *target = get_function(astmt->rhs->name);
+						if(target == NULL) {
+							fprintf(stderr, "Error: function %s not defined.\n", astmt->rhs->name);
+							exit(0);
+						}
+						tree_decl_stmt *params = target->stdecl->dirrhs->params;
+						
+						dir_decl *gp = NULL;
+						while(params) {
+							if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
+								gp = params->dirrhs;
+							}
+							params = params->next;
+						}
+
+						// find_var_prop_pair(target->next->next, visited, attr_pair);
+						// replace_map_variables(rmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+						// replace_map_variables(wmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+					} else {
+						walk_find_var_prop_pair(astmt->rhs, attr_pair);
+					}
+				}
+			}
+		}
+		
+		begin = begin->next;
+	}
+}
+
 static statement* get_statement(dir_decl *g, char *name)
 {
 	map<dir_decl*, statement*> *mp = graphs[g]->second;
@@ -1020,23 +1223,38 @@ static void get_property(char **type_ptr, char *size_ptr, statement *stmt)
 	// exit(0);
 }
 
-static void gencode_properties(map<dir_decl*, set<char*, comparator>*> &mp, map<dir_decl*, dir_decl*> &tab, statement *temp)
+static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab, statement *temp)
 {
-	char buff[500];
+	char buff[1000];
 	int count = 0;
 	
-	for(map<dir_decl*, set<char*, comparator>*>::iterator it=mp.begin(); it!=mp.end(); ++it) {
-		set<char*, comparator> *v = it->second;
+	for(map<dir_decl*, set<char*, comparator> >::iterator it=mp.begin(); it!=mp.end(); ++it) {
+		set<char*, comparator> &v = it->second;
 		char var_name[10];
 		snprintf(var_name, 10, "_flcn%d", falc_ext++);
 		count += sprintf(buff+count, "struct struct_%s %s;\n", it->first->name, var_name);
-		count += sprintf(buff+count, "cudaMemcpy(&%s, (struct struct_%s *)(%s.extra), sizeof(struct struct_%s ),cudaMemcpyDeviceToHost);\n", 
-			var_name, it->first->name, tab[it->first]->name, it->first->name);
-		char *type,	size[10];
-		for(set<char*, comparator>::iterator ii=v->begin(); ii!=v->end(); ++ii) {
-			get_property(&type, size, get_statement(it->first, *ii));
-			count += sprintf(buff+count, "cudaMemcpy(((struct struct_%s *)(%s.extra))->%s, %s.%s, sizeof(%s)*(%s.%s), cudaMemcpyDeviceToHost);\n",
-				it->first->name, it->first->name, *ii, var_name, *ii, type, it->first->name, size);
+
+		map<dir_decl*, set<char*, comparator> > gps;	// gpu graph and its attributes
+		for(set<char*, comparator>::iterator ii=v.begin(); ii!=v.end(); ++ii) {
+			dir_decl *d = find_var(tab[it->first], *ii);
+			if(d != NULL) {
+				if(gps.find(d) == gps.end()) {
+					gps.insert(pair<dir_decl*, set<char*, comparator> >(d, set<char*, comparator>()));
+				}
+				gps[d].insert(*ii);
+			}
+		}
+
+		for(map<dir_decl*, set<char*, comparator> >::iterator jj=gps.begin(); jj!=gps.end(); ++jj) {
+			count += sprintf(buff+count, "cudaMemcpy(&%s, (struct struct_%s *)(%s.extra), sizeof(struct struct_%s ),cudaMemcpyDeviceToHost);\n", 
+				var_name, it->first->name, jj->first->name, it->first->name);
+			char *type, size[10];
+
+			for(set<char*, comparator>::iterator ii=jj->second.begin(); ii!=jj->second.end(); ++ii) {
+				get_property(&type, size, get_statement(it->first, *ii));
+				count += sprintf(buff+count, "cudaMemcpy(((struct struct_%s *)(%s.extra))->%s, %s.%s, sizeof(%s)*(%s.%s), cudaMemcpyDeviceToHost);\n",
+					it->first->name, it->first->name, *ii, var_name, *ii, type, it->first->name, size);
+			}
 		}
 	}
 
@@ -1074,24 +1292,24 @@ static void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *be
 			// if(begin->f2) walk_util(old_decl, new_decl, begin->f2);
 			// if(begin->f3) walk_util(old_decl, new_decl, begin->f3);
 			
-			if(!(begin->prev && (begin->prev->sttype == EMPTY_STMT) && (begin->prev->lineno==2))) {
-				// code for copying memory from gpu to cpu.
-				map<dir_decl*, set<char*, comparator>*> rmp, wmp;
-				set<statement*> visited;
-				find_properties(rmp, wmp, begin, begin->end_stmt, NULL, visited);
+			// if(!(begin->prev && (begin->prev->sttype == EMPTY_STMT) && (begin->prev->lineno==2))) {
+			// 	// code for copying memory from gpu to cpu.
+			// 	map<dir_decl*, set<char*, comparator> > rmp, wmp;
+			// 	set<statement*> visited;
+			// 	find_properties(rmp, wmp, begin, begin->end_stmt, NULL, visited);
 
-				statement *temp = new statement();
-				temp->sttype = EMPTY_STMT;
-				temp->lineno = 2;
+			// 	statement *temp = new statement();
+			// 	temp->sttype = EMPTY_STMT;
+			// 	temp->lineno = 2;
 
-				temp->prev = begin->prev;
-				temp->next = begin;
-				begin->prev->next = temp;
-				begin->prev = temp;
+			// 	temp->prev = begin->prev;
+			// 	temp->next = begin;
+			// 	begin->prev->next = temp;
+			// 	begin->prev = temp;
 				
-				gencode_properties(rmp, tab, temp);
-				gencode_properties(wmp, tab, temp);
-			}
+			// 	gencode_properties(rmp, tab, temp);
+			// 	gencode_properties(wmp, tab, temp);
+			// }
 
 			begin = begin->end_stmt;
 		} else if(begin->sttype == ASSIGN_STMT) {
@@ -1177,25 +1395,25 @@ static statement* create_decl_statement(LIBDATATYPE type)
 	return stmt;
 }
 
-static statement* create_gettype_stmt(dir_decl *graph, dir_decl **ngraph)
+static statement* create_gettype_stmt(dir_decl *graph, dir_decl *ngraph)
 {
 	tree_expr *arg1 = new tree_expr(graph);
 	arg1->name = malloc(sizeof(char)*(1+strlen(graph->name)));
 	strcpy(arg1->name, graph->name);
 
-	dir_decl *arg6=new dir_decl();
-    arg6->name=malloc(sizeof(char)*10);
-    snprintf(arg6->name, 10, "_flcn%d", falc_ext++);
-	*ngraph = arg6;
-	arg6->gpu = 1;
-	arg6->libdtype = GRAPH_TYPE;
+	// dir_decl *arg6=new dir_decl();
+ //    arg6->name=malloc(sizeof(char)*10);
+ //    snprintf(arg6->name, 10, "_flcn%d", falc_ext++);
+	// *ngraph = arg6;
+	// arg6->gpu = 1;
+	// arg6->libdtype = GRAPH_TYPE;
 
 	tree_expr *exp1 = binaryopnode(arg1,NULL,GET_TYPE,-1);
 	exp1->rhs=new tree_expr();
 	exp1->rhs->name=malloc(sizeof(char)*10);
 	strcpy(exp1->rhs->name, "GETTYPE");
 	exp1->rhs->expr_type=VAR;
-	exp1->rhs->nextv=arg6;
+	exp1->rhs->nextv = ngraph;
 /*	
 	tree_expr *u1=arg1;
 	if(u1->expr_type==VAR && ((dir_decl *)(u1->lhs))->libdtype==GRAPH_TYPE){
@@ -1256,42 +1474,46 @@ static statement* create_gettype_stmt(dir_decl *graph, dir_decl **ngraph)
 }
 
 // Copies graph properties from one graph to another
-static void copy_graph_properties(dir_decl *dg, dir_decl *new_graph)
+static void copy_graph_properties(dir_decl *dg, dir_decl *new_graph, set<char*, comparator> &attrs)
 {
 	if(dg->ppts!=NULL){
-      extra_ppts *newppts,*oldppts=dg->ppts,*head;
-      newppts=malloc(sizeof(struct extra_ppts));
-      newppts->parent=NULL;
-      newppts->name=malloc(sizeof(char)*100);
-      strncpy(newppts->name,oldppts->name,strlen(oldppts->name));
-      newppts->libdtype=oldppts->libdtype;
-      newppts->t1=oldppts->t1;//mutliple entries point to same type
-      newppts->var2=oldppts->var2;
-      newppts->var1=oldppts->var1;
-      newppts->var3=oldppts->var3;
-      newppts->val2=oldppts->val2;
-      newppts->next=NULL;
-	  newppts->parent=dg;
-      head=newppts;
-      oldppts=oldppts->next;
+      extra_ppts *newppts=NULL,*oldppts=dg->ppts,*head = NULL;
+      
       while(oldppts){
-        newppts->next=malloc(sizeof(struct extra_ppts));
-        newppts=newppts->next;
-        newppts->parent=NULL;
-        newppts->name=malloc(sizeof(char)*100);
-        strcpy(newppts->name,oldppts->name);
-        newppts->libdtype=oldppts->libdtype;
-        newppts->t1=oldppts->t1;
-        newppts->var2=new dir_decl();
-        newppts->val2=oldppts->val2;
-        newppts->var2->name=malloc(sizeof(char)*100);
-        if(oldppts->var2!=NULL)strncpy(newppts->var2->name,oldppts->var2->name,strlen(oldppts->var2->name));
-        newppts->next=NULL;
+        if(attrs.find(oldppts->name) != attrs.end()) {
+	        if(newppts == NULL) {
+				newppts=malloc(sizeof(struct extra_ppts));
+				newppts->parent=NULL;
+				newppts->name=malloc(sizeof(char)*100);
+				strncpy(newppts->name,oldppts->name,strlen(oldppts->name));
+				newppts->libdtype=oldppts->libdtype;
+				newppts->t1=oldppts->t1;//mutliple entries point to same type
+				newppts->var2=oldppts->var2;
+				newppts->var1=oldppts->var1;
+				newppts->var3=oldppts->var3;
+				newppts->val2=oldppts->val2;
+				newppts->next=NULL;
+				newppts->parent=dg;
+				head=newppts;
+	        } else {
+		        newppts->next=malloc(sizeof(struct extra_ppts));
+		        newppts=newppts->next;
+		        newppts->parent=NULL;
+		        newppts->name=malloc(sizeof(char)*100);
+		        strcpy(newppts->name,oldppts->name);
+		        newppts->libdtype=oldppts->libdtype;
+		        newppts->t1=oldppts->t1;
+		        newppts->var2=new dir_decl();
+		        newppts->val2=oldppts->val2;
+		        newppts->var2->name=malloc(sizeof(char)*100);
+		        if(oldppts->var2!=NULL)strncpy(newppts->var2->name,oldppts->var2->name,strlen(oldppts->var2->name));
+		        newppts->next=NULL;
+		    }
+	    }
         oldppts=oldppts->next;
       }
       new_graph->ppts=head;
     }
-    
 }
 
 // Creates assignment statement
@@ -1319,7 +1541,8 @@ static statement* create_assign_statement(dir_decl *lhs, dir_decl *rhs)
     return stmt;
 }
 
-// Replaces cpu graph by gpu graph
+// Replaces cpu graph by gpu graph in the function where cpu graph is defined
+// Search cpu graph in all the statements following its declaration and replace it with gpu copy except in for stmt
 static void replace_graphs(map<dir_decl*, dir_decl*> &tab)
 {
 	for(map<dir_decl*, dir_decl*>::iterator itr=tab.begin(); itr!=tab.end(); ++itr) {
@@ -1402,37 +1625,36 @@ static void print_graph_properties(map<dir_decl*, vector<char*>*> &mp)
 	}
 }
 
-// Inserts a new graph node
-void insert_graph_node()
+static dir_decl* find_var(map<dir_decl*, set<char*, comparator> > &mp, char *cc)
 {
-/*	map<dir_decl*, vector<char*>*> mp;
-	// printf("FINDING PROPERTIES\n");
-	for(map<char*, statement*>::iterator it=fnames.begin(); it!=fnames.end(); ++it) {
-		if(strcmp("main", it->first)) {
-			// printf("FUNCTION %s\n", it->first);
-			dir_decl *g = NULL;
-			if(it->second->stdecl->dirrhs->params) {
-				tree_decl_stmt *d = it->second->stdecl->dirrhs->params;
-				while(d) {
-					if(d->dirrhs->libdtype == GRAPH_TYPE) {
-						g = d->dirrhs;
-						break;
-					}
-					d = d->next;
-				}
-			}
-			if(g) {
-				find_properties(mp, it->second, it->second->end_stmt, g);
-			}
+	for(map<dir_decl*, set<char*, comparator> >::iterator ii=mp.begin(); ii!=mp.end(); ++ii) {
+		if(ii->second.find(cc) != ii->second.end()) {
+			return ii->first;
 		}
 	}
-	// print_graph_properties(mp);
-*/
+	return NULL;
+}
 
-	map<dir_decl*, dir_decl*> tab;
+// Inserts a new graph node
+// Generate a copy of each graph in the gpu
+static void insert_graph_node(map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab)
+{
+	// map<dir_decl*, dir_decl*> tab;	// stores gpu graph corresponding to cpu copy
+	map<dir_decl*, map<dir_decl*, set<char*, comparator> > >::iterator ii;
+	// map<dir_decl*, map<dir_decl*, set<char*, comparator> > > wmp;
+	// if(graph_insert_point.size() > 0) {
+	// 	vector<statement*> visited;
+	// 	map<dir_decl*, map<dir_decl*, set<char*, comparator> > > rmp;
+	// 	map<dir_decl*, statement*>::iterator jj = graph_insert_point.begin();
+	// 	find_properties(rmp, wmp, jj->second->next, function_end(jj->second), jj->first, visited);
+	// 	copy(wmp, rmp);
+	// }
+	statement *end = NULL;
+
+	// create statement which creates gpu graph
 	for(map<dir_decl*, statement*>::iterator itr=graph_insert_point.begin(); itr!=graph_insert_point.end(); itr++) {
-		statement *begin = itr->second;
-		statement *end = itr->second->next;
+		// statement *begin = itr->second;
+		end = itr->second->next;
 		// statement *stmt = create_decl_statement(GRAPH_TYPE);
 		// insert_statement(begin, stmt, end);
 	
@@ -1441,29 +1663,46 @@ void insert_graph_node()
 
 		// stmt = create_assign_statement(stmt->stdecl->dirrhs, itr->first);
 		// insert_statement(end->prev, stmt, end);
-		
-		dir_decl *dd = NULL;
-		statement * stmt = create_gettype_stmt(itr->first, &dd);
-		insert_statement(begin, stmt, end);
-		tab[itr->first] = dd;
-		dd->libstable = itr->first->libstable;
-		stmt = create_assign_statement(dd, itr->first);
-		
-		// copy graph properties
-		copy_graph_properties(itr->first, dd);
-		insert_statement(end->prev, stmt, end);
+
+		ii = tab.find(itr->first);
+		if(ii != tab.end()) {
+			for(map<dir_decl*, set<char*, comparator> >::iterator jj=ii->second.begin(); jj!=ii->second.end(); ++jj) {
+				dir_decl *dd = jj->first;
+				statement *stmt = create_gettype_stmt(itr->first, dd);	// create graph declaration statement
+				insert_statement(end->prev, stmt, end);		// insert statement
+				// tab[itr->first] = dd;					// remember gpu copy
+				dd->libstable = itr->first->libstable;
+				stmt = create_assign_statement(dd, itr->first);		// create statement to copy cpu graph properties to gpu
+				
+				// copy graph properties
+				copy_graph_properties(itr->first, dd, jj->second);		// copy only required properties which are used in gpu kernel
+				insert_statement(end->prev, stmt, end);
+			}
+		}
 	}
 	
-	convert_to_gpu(tab); // change function to kernel and cpu parameters to gpu parameters
-	replace_graphs(tab);
-	tab.clear();
+	// convert_to_gpu(tab); 	// replace cpu graph by its gpu copy in foreach stmt, change function to kernel and cpu parameters to gpu parameters
+	// replace_graphs(tab);	// replace cpu graph by its gpu copy in each stmt following its declaration
+	// tab.clear();
+	if(end != NULL) {
+		vector<pair<tree_expr*, char*> > v;
+		set<statement*> visited;
+		find_var_prop_pair(end, visited, v, tab);
 
-	insert_node(tab, fx_sets, SET_TYPE);
-	replace(tab, fx_sets);
+		for(vector<pair<tree_expr*, char*> >::iterator ii=v.begin(); ii!=v.end(); ++ii) {
+			dir_decl *d = find_var(tab.find(ii->first->lhs)->second, ii->second);
+			if(d != NULL) {
+				ii->first->lhs = d;
+			}
+		}
+	}
 
-	tab.clear();
-	insert_node(tab, fx_collections, COLLECTION_TYPE);
-	replace(tab, fx_collections);
+	// insert_node(tab, fx_sets, SET_TYPE);	// replace cpu sets by gpu sets
+	// replace(tab, fx_sets);
+
+	// tab.clear();
+	// insert_node(tab, fx_collections, COLLECTION_TYPE);	// replace cpu collection by gpu collection
+	// replace(tab, fx_collections);
 }
 
 void print_map(map<dir_decl*, statement*> &mp)
@@ -1502,13 +1741,13 @@ static bool is_dependency(set<char*, comparator> &rset, set<char*, comparator> &
 	return false;
 }
 
-static bool is_dependency(map<dir_decl*, set<char*, comparator>*> &rmap, map<dir_decl*, set<char*, comparator>*> &wmap)
+static bool is_dependency(map<dir_decl*, set<char*, comparator> > &rmap, map<dir_decl*, set<char*, comparator> > &wmap)
 {
-	map<dir_decl*, set<char*, comparator>*>::iterator jj;
-	for(map<dir_decl*, set<char*, comparator>*>::iterator ii=rmap.begin(); ii!=rmap.end(); ++ii) {
+	map<dir_decl*, set<char*, comparator> >::iterator jj;
+	for(map<dir_decl*, set<char*, comparator> >::iterator ii=rmap.begin(); ii!=rmap.end(); ++ii) {
 		jj = wmap.find(ii->first);
 		if(jj != wmap.end()) {
-			if(is_dependency(*(ii->second), *(jj->second))) {
+			if(is_dependency(ii->second, jj->second)) {
 				return true;
 			}
 		}
@@ -1516,12 +1755,12 @@ static bool is_dependency(map<dir_decl*, set<char*, comparator>*> &rmap, map<dir
 	return false;
 }
 
-static void copy(map<dir_decl*, set<char*, comparator>*> &lhs, map<dir_decl*, set<char*, comparator>*> &rhs)
+static void copy(map<dir_decl*, set<char*, comparator> > &lhs, map<dir_decl*, set<char*, comparator> > &rhs)
 {
-	for(map<dir_decl*, set<char*, comparator>*>::iterator ii=rhs.begin(); ii!=rhs.end(); ++ii) {
-		map<dir_decl*, set<char*, comparator>*>::iterator jj = lhs.find(ii->first);
+	for(map<dir_decl*, set<char*, comparator> >::iterator ii=rhs.begin(); ii!=rhs.end(); ++ii) {
+		map<dir_decl*, set<char*, comparator> >::iterator jj = lhs.find(ii->first);
 		if(jj != lhs.end()) {
-			ii->second->insert(jj->second->begin(), jj->second->end());
+			ii->second.insert(jj->second.begin(), jj->second.end());
 		} else {
 			lhs[ii->first] = ii->second;
 		}
@@ -1529,7 +1768,7 @@ static void copy(map<dir_decl*, set<char*, comparator>*> &lhs, map<dir_decl*, se
 }
 
 
-static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, tree_decl_stmt *params, assign_stmt *args)
+static void replace_map_variables(map<dir_decl*, set<char*, comparator> > &tab, tree_decl_stmt *params, assign_stmt *args)
 {
 	int count = 0;
 	while(params && args) {
@@ -1540,7 +1779,7 @@ static void replace_map_variables(map<dir_decl*, set<char*, comparator>*> &tab, 
 					tab.erase(params->dirrhs);
 				}
 			} else if(tab.find(params->dirrhs) != tab.end()) {
-				tab[args->rhs->lhs]->insert(tab[params->dirrhs]->begin(), tab[params->dirrhs]->end());
+				tab[args->rhs->lhs].insert(tab[params->dirrhs].begin(), tab[params->dirrhs].end());
 			}
 		}
 		params = params->next;
@@ -1674,11 +1913,47 @@ static bool same_level(statement *start, statement *end, statement *goal)
 	}
 }
 
+static void find_attrs_in_kernel(map<dir_decl*, set<char*, comparator> > &rmp, map<dir_decl*, set<char*, comparator> > &wmp,
+				map<dir_decl*, vector<statement*> > &kers, statement *foreach_stmt)
+{
+	assign_stmt *astmt = foreach_stmt->stassign->rhs->arglist;
+	while(astmt) {
+		if(astmt->rhs && astmt->rhs->expr_type == VAR && astmt->rhs->lhs->libdtype == GRAPH_TYPE) {
+			dir_decl *d = astmt->rhs->lhs;
+			if(kers.find(d) != kers.end()) {
+				kers[d].push_back(foreach_stmt);
+			} else {
+				kers.insert(pair<dir_decl*, vector<statement*> >(d, vector<statement*>(1, foreach_stmt)));
+			}
+			// if(graphs.find(d) == graphs.end()) {
+			// 	graphs.insert(d);
+			// 	if(dev_no > 0) {
+			// 		d->dev_no = dev_no;
+			// 	}
+			// 	dev_no++;
+			// } else {
+			// 	(*jj)->stream_id = stream_no++;
+			// }
+			// insert props
+			set<statement*> visited;
+			statement *target = get_function(foreach_stmt->stassign->rhs->name);
+			if(target == NULL) {
+				fprintf(stderr, "%s function definition not found.\n", foreach_stmt->stassign->rhs->name);
+				exit(1);
+			}
+			find_properties(rmp, wmp, target->next->next, target->end_stmt, d, visited);
+			
+			break;
+		}
+		astmt = astmt->next;
+	}
+}
+
 // Finds global variables used in kernels
 void get_variables(bool isGPU, bool cpuParallelSection = false)
 {
 	std::set<dir_decl *> gset;	// keeps gpu global variables
-	map<dir_decl*, set<char*, comparator>*> rmap1, rmap2, wmap1, wmap2, *curr_rmap, *curr_wmap, *next_rmap, *next_wmap;
+	map<dir_decl*, set<char*, comparator> > rmap1, rmap2, wmap1, wmap2, *curr_rmap, *curr_wmap, *next_rmap, *next_wmap;
 	curr_rmap = &rmap1;
 	next_rmap = &rmap2;
 	curr_wmap = &wmap1;
@@ -1693,6 +1968,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 
 	vector<statement*> kernels;
 
+	// finds dependency between kernels.
 	for(int i=0; i<foreach_list.size(); ++i)
 	{
 		statement *stmt = foreach_list[i];
@@ -1741,15 +2017,15 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 			bool rm = !(is_dependency(k_rset, wset) || is_dependency(rset, k_wset));
 			if(rm || prev_rm) {
 				// find attributes of graph
-				map<dir_decl*, set<char*, comparator>*> &krmap = *curr_rmap, &kwmap = *curr_wmap;
-				map<dir_decl*, set<char*, comparator>*>::iterator jj;
+				map<dir_decl*, set<char*, comparator> > &krmap = *curr_rmap, &kwmap = *curr_wmap;
+				map<dir_decl*, set<char*, comparator> >::iterator jj;
 				visited.clear();
 				find_properties(krmap, kwmap, target->next->next, target->end_stmt, gp, visited);
 				replace_map_variables(krmap, target->stdecl->dirrhs->params, stmt->stassign->rhs->arglist);
 				replace_map_variables(kwmap, target->stdecl->dirrhs->params, stmt->stassign->rhs->arglist);
 				
 				// attributes after
-				map<dir_decl*, set<char*, comparator>*> crmap, cwmap;
+				map<dir_decl*, set<char*, comparator> > crmap, cwmap;
 				if(rm) {
 					visited.clear();
 					find_properties(crmap, cwmap, stmt, end, NULL, visited);
@@ -1820,43 +2096,226 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 		int stream_no = 1;
 		vector<statement*>::iterator jj = kernels.begin();
 
+		map<dir_decl*, map<dir_decl*, set<char*, comparator> > > tab;
+		map<dir_decl*, map<dir_decl*, set<char*, comparator> > >::iterator kk;
+
+		vector<statement*>::iterator start = kernels.end(), end = kernels.end();
+		
 		for(vector<statement*>::iterator ii=sections_stmts.begin(); ii!=sections_stmts.end(); ++ii) {
 			// printf("-->%d\n", (*ii)->lineno);
 			int dev_no = 0;
 			statement *curr = (*ii)->next;
+			set<dir_decl*> seen;	// store those gpu graph which has been used in previous section
+			
 			while(curr != (*ii)->end_stmt) {
 				if(curr->sttype != SECTION_STMT) {
 					fprintf(stderr, "%s %d\n", "SECTION not found", curr->lineno);
 					exit(1);
 				}
 
+				map<dir_decl*, set<char*, comparator> > rmp, wmp;
+				map<dir_decl*, vector<statement*> > kers;
+				
 				for(; jj!=kernels.end(); ++jj) {
 					if((*jj)->lineno > curr->end_stmt->lineno) {
 						break;
 					} else if((*jj)->lineno >= curr->lineno) {
-						assign_stmt *astmt = (*jj)->stassign->rhs->arglist;
-						while(astmt) {
-							if(astmt->rhs && astmt->rhs->expr_type == VAR && astmt->rhs->lhs->libdtype == GRAPH_TYPE) {
-								dir_decl *d = astmt->rhs->lhs;
-								if(graphs.find(d) == graphs.end()) {
-									graphs.insert(d);
-									if(dev_no > 0) {
-										d->dev_no = dev_no;
-									}
-									dev_no++;
-								} else {
-									(*jj)->stream_id = stream_no++;
-								}
-								break;
-							}
-							astmt = astmt->next;
+						if(start == kernels.end()) {
+							start = jj;
 						}
+						end = jj;
+
+						find_attrs_in_kernel(rmp, wmp, kers, *jj);
+						// assign_stmt *astmt = (*jj)->stassign->rhs->arglist;
+						// while(astmt) {
+						// 	if(astmt->rhs && astmt->rhs->expr_type == VAR && astmt->rhs->lhs->libdtype == GRAPH_TYPE) {
+						// 		dir_decl *d = astmt->rhs->lhs;
+						// 		if(kers.find(d) != kers.end()) {
+						// 			kers[d].push_back(*jj);
+						// 		} else {
+						// 			kers.insert(pair<dir_decl*, vector<statement*> >(d, vector<statement*>(1, *jj)));
+						// 		}
+						// 		// if(graphs.find(d) == graphs.end()) {
+						// 		// 	graphs.insert(d);
+						// 		// 	if(dev_no > 0) {
+						// 		// 		d->dev_no = dev_no;
+						// 		// 	}
+						// 		// 	dev_no++;
+						// 		// } else {
+						// 		// 	(*jj)->stream_id = stream_no++;
+						// 		// }
+						// 		// insert props
+						// 		set<statement*> visited;
+						// 		statement *target = get_function((*jj)->stassign->rhs->name);
+						// 		if(target == NULL) {
+						// 			fprintf(stderr, "%s function definition not found.\n", (*jj)->stassign->rhs->name);
+						// 			exit(1);
+						// 		}
+						// 		find_properties(rmp, wmp, target->next->next, target->end_stmt, d, visited);
+								
+						// 		break;
+						// 	}
+						// 	astmt = astmt->next;
+						// }
 					}
 				}
 
+				// set<string> attrs;
+
+				// for(map<dir_decl*, set<char*, comparator> >::iterator it1=rmp.begin(); it1!=rmp.end(); ++it1) {
+				// 	if(wmp.find(it1->first) != wmp.end()) {
+				// 		wmp[it1->first].insert(it1->second.begin(), it1->second.end());
+				// 	} else {
+				// 		wmp.insert(pair<dir_decl*, set<char*, comparator> >(it1->first, it1->second));
+				// 	}
+				// }
+
+				copy(wmp, rmp);
+				
+				// replace graph used in each section by new gpu graph
+				for(map<dir_decl*, set<char*, comparator> >::iterator it1=wmp.begin(); it1!=wmp.end(); ++it1) {
+					kk = tab.find(it1->first);
+					dir_decl *dn = NULL;
+					if(kk == tab.end()) {
+						dn = new dir_decl();
+						dn->dev_no = dev_no;
+						dn->gpu = 1;
+						dn->libdtype = GRAPH_TYPE;
+						char buff[30];
+						snprintf(buff, 10, "_flcn%d", falc_ext++);
+						dn->name = create_string(buff);
+
+						tab.insert(pair<dir_decl*, map<dir_decl*, set<char*, comparator> > >(it1->first, map<dir_decl*, set<char*, comparator> >()));
+						tab[it1->first].insert(pair<dir_decl*, set<char*, comparator> >(dn, it1->second));
+					} else {
+						int mx_count = 0;
+						for(map<dir_decl*, set<char*, comparator> >::iterator it2=kk->second.begin(); it2!=kk->second.end(); ++it2) {
+							if(seen.find(it2->first) == seen.end()) {
+								int cnt = 0;
+								for(set<char*, comparator>::iterator it3=it1->second.begin(); it3!=it1->second.end(); ++it3) {
+									if(it2->second.find(*it3) != it2->second.end()) {
+										cnt++;
+									}
+								}
+								if(cnt > mx_count) {
+									mx_count = cnt;
+									dn = it2->first;
+								}
+							}
+						}
+
+						if(dn != NULL) {
+							kk->second[dn].insert(it1->second.begin(), it1->second.end());
+						} else {
+							dn = new dir_decl();
+							dn->dev_no = dev_no;
+							dn->gpu = 1;
+							dn->libdtype = GRAPH_TYPE;
+							char buff[30];
+							snprintf(buff, 10, "_flcn%d", falc_ext++);
+							dn->name = create_string(buff);
+
+							kk->second.insert(pair<dir_decl*, set<char*, comparator> >(dn, it1->second));
+						}
+					}
+
+					for(vector<statement*>::iterator it2=kers[it1->first].begin(); it2!=kers[it1->first].end(); ++it2) {
+						change_cpu_graph(*it2, dn);
+					}
+					seen.insert(dn);
+				}
+				// map<dir_decl*, set<char*, comparator>*>::iterator it1 = rmp.find(d);
+				// if(it1 != rmp.end()) {
+				// 	for(set<char*, comparator>::iterator it2=it1->second->begin(); it2!=it1->second->end(); ++it2) {
+				// 		attrs.insert(string(*it2));
+				// 	}
+				// }
+				// it1 = wmp.find(d);
+				// if(it1 != wmp.end()) {
+				// 	for(set<char*, comparator>::iterator it2=it1->second->begin(); it2!=it1->second->end(); ++it2) {
+				// 		attrs.insert(string(*it2));
+				// 	}
+				// }
+				// wmp.clear();
+				// rmp.clear();
+				
+				dev_no++;
 				curr = curr->end_stmt->next;
 			}
 		}
+
+		map<dir_decl*, set<char*, comparator> > rmp, wmp;
+		map<dir_decl*, vector<statement*> > kers;
+
+		for(jj=kernels.begin(); jj!=start; ++jj) {
+			find_attrs_in_kernel(rmp, wmp, kers, *jj);
+		}
+		if(end != kernels.end()) {
+			++end;
+			for(; end!=kernels.end(); ++end) {
+				find_attrs_in_kernel(rmp, wmp, kers, *end);
+			}
+		}
+		copy(wmp, rmp);
+		for(map<dir_decl*, set<char*, comparator> >::iterator it1=wmp.begin(); it1!=wmp.end(); ++it1) {
+			kk = tab.find(it1->first);
+			dir_decl *dn = NULL;
+			if(kk == tab.end()) {
+				dn = new dir_decl();
+				dn->dev_no = 0;
+				dn->gpu = 1;
+				dn->libdtype = GRAPH_TYPE;
+				char buff[30];
+				snprintf(buff, 10, "_flcn%d", falc_ext++);
+				dn->name = create_string(buff);
+
+				tab.insert(pair<dir_decl*, map<dir_decl*, set<char*, comparator> > >(it1->first, map<dir_decl*, set<char*, comparator> >()));
+				tab[it1->first].insert(pair<dir_decl*, set<char*, comparator> >(dn, it1->second));
+			} else {
+				int mx_count = 0;
+				dir_decl *defg = NULL;
+
+				for(map<dir_decl*, set<char*, comparator> >::iterator it2=kk->second.begin(); it2!=kk->second.end(); ++it2) {
+					int cnt = 0;
+					for(set<char*, comparator>::iterator it3=it1->second.begin(); it3!=it1->second.end(); ++it3) {
+						if(it2->second.find(*it3) != it2->second.end()) {
+							cnt++;
+						}
+					}
+					if(cnt > mx_count) {
+						mx_count = cnt;
+						dn = it2->first;
+					} else if(it2->first->dev_no == 0) {
+						defg = it2->first;
+					}
+				}
+
+				// if no gpu graph which uses this attrs, then map it to graph at device 0
+				if(dn == NULL) {
+					dn = defg;
+				}
+
+				if(dn != NULL) {
+					kk->second[dn].insert(it1->second.begin(), it1->second.end());
+				} else {
+					dn = new dir_decl();
+					dn->dev_no = 0;
+					dn->gpu = 1;
+					dn->libdtype = GRAPH_TYPE;
+					char buff[30];
+					snprintf(buff, 10, "_flcn%d", falc_ext++);
+					dn->name = create_string(buff);
+
+					kk->second.insert(pair<dir_decl*, set<char*, comparator> >(dn, it1->second));
+				}
+			}
+
+			for(vector<statement*>::iterator it2=kers[it1->first].begin(); it2!=kers[it1->first].end(); ++it2) {
+				change_cpu_graph(*it2, dn);
+			}
+		}
+
+		insert_graph_node(tab);
 
 	} else if(cpuParallelSection) {
 

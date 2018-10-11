@@ -2457,11 +2457,11 @@ int main(int argc, char *argv[]){
     fprintf(FP,"#include \"../include/HSet.h\"\n");
   }
 
-  if(isGPU) {
-    insert_graph_node(); // insert GPU graph node;
-    // convert_to_gpu(); // converts parameter of kernels to GPU variable type
-    // get_variables();  // converts global variables
-  }
+  // if(isGPU) {
+  //   insert_graph_node(); // insert GPU graph node;
+  //   // convert_to_gpu(); // converts parameter of kernels to GPU variable type
+  //   // get_variables();  // converts global variables
+  // }
   get_variables(isGPU, cpuParallelSection);
 
   temp->print();
