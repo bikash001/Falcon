@@ -46,7 +46,7 @@ int optimizeone();
 int optimizetwo();
 int optimize();
 int readMesh(char *filename,int dims);
-int cloneGPU(GGraph &graph,int num);
+int cloneGPU(GGraph &graph,int num, bool dynamic_graph=false);
 int cloneMorphGPU(GGraph &graph,int num);
 int copytoGPU(GGraph &graph);
 int copyfromGPU(GGraph &graph);
@@ -651,7 +651,7 @@ return 1;
 
 
 
-int HGraph::cloneGPU(GGraph &graph,int num){
+int HGraph::cloneGPU(GGraph &graph,int num, bool dynamic_graph=false){
 cudaSetDevice(num);
 graph.npoints=npoints;
 graph.maxnpoints=maxnpoints;
@@ -664,6 +664,8 @@ if(cudaMemcpy(graph.pnedges,&(pnedges),sizeof(int),cudaMemcpyHostToDevice)!=cuda
 graph.pdims=pdims;
 graph.edims=edims;
 if(cudaMalloc((void **)&(graph.points),(npoints+1)*sizeof(union float_int)*(pdims))!=cudaSuccess)printf("ALLOC ERRRR\n");
+if(cudaMemcpy(graph.points,points,(npoints+1)*sizeof(union float_int)*(pdims),cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 541 HGraph");
+
 if(index_type == 1) {
   if(cudaMalloc((void **)&(graph.index),(nedges)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");  
   cudaMemcpy(graph.index,index,sizeof(int)*(nedges),cudaMemcpyHostToDevice);
@@ -671,17 +673,23 @@ if(index_type == 1) {
   if(cudaMalloc((void **)&(graph.index),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
   cudaMemcpy(graph.index,index,sizeof(int)*(npoints+1),cudaMemcpyHostToDevice);
 }
+
 //printf("YY1\n");
-if(cudaMalloc((void **)&(graph.edges),(nedges+1)*MORPH_FACT*sizeof(union float_int)*(edims))!=cudaSuccess)printf("ALLOC EDGE ERROR\n");
-if(cudaMemcpy(graph.points,points,(npoints+1)*sizeof(union float_int)*(pdims),cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 541 HGraph");
-if(cudaMemcpy(graph.edges,edges,(nedges+1)*MORPH_FACT*sizeof(union float_int)*(edims),cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 542  HGraph");
+if(dynamic_graph) {
+  if(cudaMalloc((void **)&(graph.edges),(nedges+1)*MORPH_FACT*sizeof(union float_int)*(edims))!=cudaSuccess)printf("ALLOC EDGE ERROR\n");
+  if(cudaMemcpy(graph.edges,edges,(nedges+1)*MORPH_FACT*sizeof(union float_int)*(edims),cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 542  HGraph");
+} else {
+  if(cudaMalloc((void **)&(graph.edges),(nedges+1)*sizeof(union float_int)*(edims))!=cudaSuccess)printf("ALLOC EDGE ERROR\n");
+  if(cudaMemcpy(graph.edges,edges,(nedges+1)*sizeof(union float_int)*(edims),cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 542  HGraph");
+}
+
 if(total!=NULL){
-if(cudaMalloc((void **)&(graph.total),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
-if(cudaMemcpy(graph.total,total,(npoints+1)*sizeof(int)*1,cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 545 HGraph");
+  if(cudaMalloc((void **)&(graph.total),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
+  if(cudaMemcpy(graph.total,total,(npoints+1)*sizeof(int)*1,cudaMemcpyHostToDevice)!=cudaSuccess)printf("error line 545 HGraph");
 }
 if(outtotal!=NULL){
-if(cudaMalloc((void **)&(graph.outtotal),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
-if(cudaMemcpy(graph.outtotal,outtotal,sizeof(int)*(npoints+1),cudaMemcpyHostToDevice)!=cudaSuccess)printf("OUTTOTAL COPY ERROR\n");
+  if(cudaMalloc((void **)&(graph.outtotal),(npoints+1)*sizeof(int))!=cudaSuccess)printf("ALLOC ERRRR\n");
+  if(cudaMemcpy(graph.outtotal,outtotal,sizeof(int)*(npoints+1),cudaMemcpyHostToDevice)!=cudaSuccess)printf("OUTTOTAL COPY ERROR\n");
 }
 
 cudaDeviceSynchronize();
