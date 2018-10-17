@@ -2384,8 +2384,8 @@ printlibdtypes(){
 
 int main(int argc, char *argv[]){
   if(argc<2){
-    printf("LEss number of arguments\n");
-    return;
+    printf("USAGE: <input file>\n");
+    return 1;
   }
   yyin=fopen(argv[1],"r");
   int t1=0;
@@ -2439,15 +2439,25 @@ int main(int argc, char *argv[]){
   FPG=fopen(gheader,"w+");
   if(FPG==NULL){printf("FOPEN FAILED\n");return;}
   fprintf(FPG,"int FALC_THREADS;\n");
-  fprintf(FP1,"\n #include \"%s\"\n",header);
-  fprintf(FP,"\n#include \"%s\"\n",gheader);
+  char *chptr = strrchr(header, '/');
+  if(chptr != NULL) {
+    fprintf(FP1,"\n #include \"%s\"\n", chptr+1);
+  } else {
+    fprintf(FP1,"\n #include \"%s\"\n", header);
+  }
+  chptr = strchr(gheader, '/');
+  if(chptr != NULL) {
+    fprintf(FP,"\n#include \"%s\"\n", chptr+1);
+  } else {
+   fprintf(FP,"\n#include \"%s\"\n", gheader);
+  }
   system("rm -f global.h");
   if(GALOIS_FLAG==0){
     for(int ii=0;ii<TOT_GPU_GRAPH;ii++)fprintf(FP1,"cudaDeviceProp prop%d;\n",ii);
     if(GPUCODEFLAG){
-      fprintf(FP," #include \"HGraph.h\"\n #include \"GGraph.cu\"\n#include \"thrust.cu\"\n #include \"HSetOPT.h\"\n #include<sys/time.h>\n#include </usr/local/cuda/include/cuda.h>\n #include </usr/local/cuda/include/cuda_runtime_api.h>\n#include<unistd.h>\n");
+      fprintf(FP," #include \"../GPU/generated/include/HGraph.h\"\n #include \"../GPU/generated/include/GGraph.cu\"\n#include \"../GPU/generated/include/thrust.cu\"\n #include \"../GPU/generated/include/HSetOPT.h\"\n #include<sys/time.h>\n#include </usr/local/cuda/include/cuda.h>\n #include </usr/local/cuda/include/cuda_runtime_api.h>\n#include<unistd.h>\n");
     }else {
-      fprintf(FP," #include \"../include/HGraph.h\"\n  #include \"../include/HSetOPT.h\"\n #include<sys/time.h>\n#include<unistd.h>\n");
+      fprintf(FP," #include \"../CPU/generated/include/HGraph.h\"\n  #include \"../CPU/generated/include/HSetOPT.h\"\n #include<sys/time.h>\n#include<unistd.h>\n");
 
     }
   }
@@ -2469,7 +2479,7 @@ int main(int argc, char *argv[]){
   ERRPRINT=1;
   temp->print();
   if(errflag!=0){
-    printf("skipping codegeneration\n");
+    printf("Error found, skipping codegeneration\n");
     exit(0);
   }
 
