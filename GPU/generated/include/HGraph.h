@@ -651,7 +651,7 @@ return 1;
 
 
 
-int HGraph::cloneGPU(GGraph &graph,int num, bool dynamic_graph=false){
+int HGraph::cloneGPU(GGraph &graph,int num, bool dynamic_graph){
 cudaSetDevice(num);
 graph.npoints=npoints;
 graph.maxnpoints=maxnpoints;

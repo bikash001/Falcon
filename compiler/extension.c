@@ -1636,8 +1636,10 @@ static void print_graph_properties(map<dir_decl*, vector<char*>*> &mp)
 static dir_decl* find_var(map<dir_decl*, set<char*, comparator> > &mp, char *cc)
 {
 	for(map<dir_decl*, set<char*, comparator> >::iterator ii=mp.begin(); ii!=mp.end(); ++ii) {
-		if(ii->second.find(cc) != ii->second.end()) {
-			return ii->first;
+		if(ii->first->gpu > 0) {
+			if(ii->second.find(cc) != ii->second.end()) {
+				return ii->first;
+			}
 		}
 	}
 	return NULL;
