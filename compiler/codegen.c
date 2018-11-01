@@ -310,7 +310,9 @@ void statement::codeGen(FILE *FP1) {
             	if(OMP_NESTED) {
             		fprintf(FP1, "%s\n", "\tomp_set_dynamic(0);\n\tomp_set_nested(1);");
             	}
-                for(int ii=0; ii<TOT_GPU_GRAPH; ii++)fprintf(FP1,"\ncudaGetDeviceProperties(&prop%d,%d);",ii,ii%4);
+                for(int ii=0; ii<TOT_GPU_GRAPH; ii++){
+                	fprintf(FP1,"\ncudaGetDeviceProperties(&prop%d,%d);",ii,ii%4);
+                }
                 fprintf(FP1," \nalloc_sync_array();\n");
             }
             if(GPUCODEFLAG==0)fprintf(FP1,"if(argc>2)FALC_THREADS=atoi(argv[2]);");

@@ -34,6 +34,7 @@ static char* create_string(char *str);
 static statement* function_end(statement *stmt);
 static dir_decl* find_var(map<dir_decl*, set<char*, comparator> > &mp, char *cc);
 static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab, statement *temp);
+extern int TOT_GPU_GRAPH;
 
 struct comparator
 {
@@ -2318,6 +2319,9 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				
 				dev_no++;
 				curr = curr->end_stmt->next;
+				if(dev_no > TOT_GPU_GRAPH) {
+					TOT_GPU_GRAPH = dev_no;
+				}
 			}
 		}
 
