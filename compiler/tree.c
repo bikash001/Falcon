@@ -293,7 +293,13 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
             }
             if(expr->lhs && expr->lhs->rhs && expr->lhs->rhs->expr_type==ARRREF&& expr->lhs->libdtype>0 ) {
                 tree_expr *tt=expr;
-                while(tt->lhs)tt=tt->lhs;
+                while(tt->lhs){
+                    if(tt->expr_type == VAR) {
+                        tt=tt->lhs;
+                        break;
+                    }
+                    tt = tt->lhs;
+                }
                 dir_decl *dd1=tt;
                 int flag=0;
                 struct extra_ppts *eppt= tt->ppts;

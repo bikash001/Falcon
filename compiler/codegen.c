@@ -274,7 +274,6 @@ void codegenReduxMul(statement *t) {
 void statement::codeGen(FILE *FP1) {
     static int n;
     int xu,XX;
-//fprintf(stderr,"%d\n",this->lineno);
     if(this->sttype==FUNCTION_EBLOCK_STMT ) {
         NESTED_FOREACH=0;
         fprintf(FP1,"}\n");

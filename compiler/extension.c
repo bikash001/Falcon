@@ -1097,7 +1097,7 @@ static void find_var_prop_pair(statement *begin, set<statement*> &visited, vecto
 				// code for copying memory from gpu to cpu.
 				map<dir_decl*, set<char*, comparator> > rmp, wmp;
 				set<statement*> v;
-				find_properties(rmp, wmp, begin, begin->end_stmt, NULL, v);
+				find_properties(rmp, wmp, begin, begin->end_stmt, NULL, v);	// find attributes used inside for-loop
 
 				statement *temp = new statement();
 				temp->sttype = EMPTY_STMT;
@@ -1223,26 +1223,35 @@ static void get_property(char **type_ptr, char *size_ptr, statement *stmt)
 	// exit(0);
 }
 
+/**
+* This function finds attributes which are allocated in some gpu and are being used in cpu for loop, and copies the attribute
+* from the gpu to cpu before starting of for-loop.
+* 
+* @params mp: contains cpu-graph and those properties of the graph which are being used in the for-loop
+* @params tab: contains cpu graph and it's gpu instances containing the attributes used in gpu
+* @params temp: empty statement which is to be filled with copy statements.
+**/
 static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab, statement *temp)
 {
 	char buff[1000];
 	int count = 0;
 	
+	// loop over all the cpu graph and it's atrributes which are being used in the for loop
 	for(map<dir_decl*, set<char*, comparator> >::iterator it=mp.begin(); it!=mp.end(); ++it) {
-		set<char*, comparator> &v = it->second;
+		set<char*, comparator> &v = it->second;		// attributes used in for loop
 		char var_name[10];
-		snprintf(var_name, 10, "_flcn%d", falc_ext++);
-		count += sprintf(buff+count, "struct struct_%s %s;\n", it->first->name, var_name);
+		snprintf(var_name, 10, "_flcn%d", falc_ext++);	// temporary variable name
+		count += sprintf(buff+count, "struct struct_%s %s;\n", it->first->name, var_name); 	// declare temporary graph variable
 
+		// find from which gpu graph what are the attributes need to be copied
 		map<dir_decl*, set<char*, comparator> > gps;	// gpu graph and its attributes
 		for(set<char*, comparator>::iterator ii=v.begin(); ii!=v.end(); ++ii) {
-			dir_decl *d = find_var(tab[it->first], *ii);
-			if(d != NULL && d != it->first) {
+			dir_decl *d = find_var(tab[it->first], *ii);	// find graph instance where this attribute is modified/allocated
+			if(d != NULL && d != it->first) {	// if attribute is allocated in gpu, copy it to cpu
 				if(gps.find(d) == gps.end()) {
 					gps.insert(pair<dir_decl*, set<char*, comparator> >(d, set<char*, comparator>()));
 				}
 				gps[d].insert(*ii);
-
 			}
 
 			// store these attributes in cpu copy as we need to allocate memory
@@ -1546,6 +1555,7 @@ static statement* create_assign_statement(dir_decl *lhs, dir_decl *rhs)
     statement *stmt=new statement();
     stmt->sttype= ASSIGN_STMT;
     stmt->stassign = ptr;
+    stmt->lineno = 1111;
     return stmt;
 }
 
@@ -1694,10 +1704,12 @@ static void insert_graph_node(map<dir_decl*, map<dir_decl*, set<char*, comparato
 	// convert_to_gpu(tab); 	// replace cpu graph by its gpu copy in foreach stmt, change function to kernel and cpu parameters to gpu parameters
 	// replace_graphs(tab);	// replace cpu graph by its gpu copy in each stmt following its declaration
 	// tab.clear();
+	
+	// find graph attributes which are used in cpu
 	if(end != NULL) {
-		vector<pair<tree_expr*, char*> > v;	// stores <graph, attribute_name> pair
+		vector<pair<tree_expr*, char*> > v;	// stores <graph, attribute_name> pair; first arg is the parent of the graph, i.e tree_expr->lhs is the graph
 		set<statement*> visited;
-		find_var_prop_pair(end, visited, v, tab);
+		find_var_prop_pair(end, visited, v, tab);	// find all the attributes corresponding to each graph
 
 		// replace all uses of cpu graph with gpu graphs which contains the attributes used here
 		for(vector<pair<tree_expr*, char*> >::iterator ii=v.begin(); ii!=v.end(); ++ii) {
@@ -1718,20 +1730,20 @@ static void insert_graph_node(map<dir_decl*, map<dir_decl*, set<char*, comparato
 
 	// remove cpu attributes not required.
 	for(map<dir_decl*, map<dir_decl*, set<char*, comparator> > >::iterator ii=tab.begin(); ii!=tab.end(); ++ii) {
-		map<dir_decl*, set<char*, comparator> >::iterator jj = ii->second.find(ii->first);
-		if(jj != ii->second.end()) {
+		map<dir_decl*, set<char*, comparator> >::iterator jj = ii->second.find(ii->first);	// find cpu attributes
+		if(jj != ii->second.end()) {	// some attributes need allocation
 			extra_ppts *ppts = jj->first->ppts;
 			while(ppts) {
-				if(jj->second.find(ppts->name) == jj->second.end()) {
+				if(jj->second.find(ppts->name) == jj->second.end()) {	// if an attribute is not found, it means we don't need to allocate memory in cpu
 					ppts->mem_allocate = false;
 				}
 				ppts = ppts->next;
 			}
-		} else {
-			extra_ppts *ppts = jj->first->ppts;
+		} else {	// no attributes need allocation
+			extra_ppts *ppts = ii->first->ppts;
 			while(ppts) {
-				ppts = ppts->next;
 				ppts->mem_allocate = false;
+				ppts = ppts->next;
 			}
 		}
 	}

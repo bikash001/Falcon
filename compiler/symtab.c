@@ -2083,7 +2083,7 @@ int print_gpu_if_stmt(statement *t1,int val) {
 
 
 }
-print_gpu_assign_stmt(statement *t1,int val) {
+int print_gpu_assign_stmt(statement *t1,int val) {
 //fprintf(FP1,"//val==%d \n",val);
     char arr1[200],arr2[200],arr3[200];
     for(int i=0; i<200; i++) {
@@ -2124,7 +2124,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
             }
             fprintf(FP1,";");
         }
-        return;
+        return 0;
     }
     if(t1->stassign->lhs==NULL|| t1->stassign->rhs==NULL)return -1 ;
     if(val==1) {
@@ -2179,7 +2179,13 @@ print_gpu_assign_stmt(statement *t1,int val) {
                 fprintf(FP1,"cudaSetDevice(0);\n");
             }
             tree_expr *te1=t1->stassign->lhs;
-            while(te1->lhs!=NULL)te1=te1->lhs;
+            while(te1->lhs!=NULL) {
+                if(te1->expr_type == VAR) {
+                    te1=te1->lhs;
+                    break;
+                }
+                te1=te1->lhs;
+            }
             if(t1->stassign->lhs->libdtype>0 && t1->stassign->lhs->libdtype!=3 && t1->stassign->rhs->libdtype==t1->stassign->lhs->libdtype) {
                 if(te1->clone==0) {
                 }
@@ -2237,7 +2243,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
                             fprintf(FP1,"%scudaMemcpy((%s),(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
-                        return;
+                        return 0;
                     }
                     char temp[25];
                     te1=t1->stassign->rhs;
@@ -2264,7 +2270,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
             t1->stassign->lhs->printcode1(t1->stassign->lhs,arr1);
             t1->stassign->rhs->printcode1(t1->stassign->rhs,arr2);
             fprintf(FP1,"cudaMemcpy(%s,&%s,sizeof(int),cudaMemcpyHostToDevice);\n",arr1,arr2);
-            return;
+            return 0;
         }
         if(t1->stassign->rhs->dtype>=0 && t1->stassign->rhs->dtype==11) {
 //fprintf(FP1,"/********* here something has to be done code has to be written ******************/\n");
@@ -2291,7 +2297,13 @@ print_gpu_assign_stmt(statement *t1,int val) {
             else {
                 if(((tree_expr *)(t1->stassign->lhs))->expr_type==STRUCTREF) {
                     tree_expr *te1= t1->stassign->lhs;
-                    while(te1->lhs!=NULL)te1=te1->lhs;
+                    while(te1->lhs!=NULL){
+                        if(te1->expr_type == VAR) {
+                            te1=te1->lhs;
+                            break;
+                        }
+                        te1=te1->lhs;
+                    }
                     dir_decl *dd=te1;
                 }
                 fprintf(FP1, "%s  falcvt%d;\n",dtypenames[t1->stassign->rhs->dtype],++Temp);
@@ -2317,7 +2329,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
                             if(extemp<=10)sprintf(tarr+6,p+2);
                             if(extemp>10)sprintf(tarr+7,p+2);
                             fprintf(FP1,"%s=%s; \n",tarr,arr2);
-                            return;
+                            return 0;
                         }
                         else {
                             p=strrchr(arr1,'.');
@@ -2331,7 +2343,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
                             fprintf(FP1,"%scudaMemcpy(&(%s),&(falcvt%d),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
-                        return;
+                        return 0;
                     }
                     fprintf(FP1,"%scudaMemcpy(&(%s),&(falcvt%d),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
 
@@ -2406,7 +2418,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
                         fprintf(FP1,"%scudaMemcpy((%s),(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                         for(int i=0; i<200; i++)gp_string[i]='\0';
                     }
-                    return;
+                    return 0;
                 }
                 for(int i=0; i<25; i++)temp[i]='\0';
                 if(t1->stassign->lhs->libdtype==7)strcpy(temp,"npoints");
@@ -2426,7 +2438,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
             t1->stassign->lhs->printcode1(t1->stassign->lhs,arr1);
             t1->stassign->rhs->printcode1(t1->stassign->rhs,arr2);
             fprintf(FP1,"cudaMemcpy(&%s,%s,sizeof(%s),cudaMemcpyDeviceToHost);\n",arr1,arr2,dtypenames[t1->stassign->lhs->dtype]);
-            return;
+            return 0;
         }
         if(t1->stassign->lhs->dtype>=0) {
             t1->stassign->rhs->printcode1(t1->stassign->rhs,arr2);
@@ -2448,7 +2460,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
                     if(extemp<=10)sprintf(tarr+6,p+2);
                     if(extemp>10)sprintf(tarr+7,p+2);
                     fprintf(FP1,"%s=%s; \n",arr1,tarr);
-                    return;
+                    return 0;
                 }
                 else {
                     p=strrchr(arr2,'.');
@@ -2462,7 +2474,7 @@ print_gpu_assign_stmt(statement *t1,int val) {
                     fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                     for(int i=0; i<200; i++)gp_string[i]='\0';
                 }
-                return;
+                return 0;
             }
             if(t1->stassign->lhs->expr_type==VAR && t1->stassign->lhs->lhs->ptrflag==0)fprintf(FP1,"%scudaMemcpyFromSymbol(&(%s),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->stassign->lhs->dtype],cpy[1],errcnt++,cpy[2]);
             else {
@@ -2478,5 +2490,6 @@ print_gpu_assign_stmt(statement *t1,int val) {
     }
     if(val==5) {
     }
+    return 0;
 }
 
