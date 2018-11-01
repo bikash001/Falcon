@@ -2454,6 +2454,15 @@ int main(int argc, char *argv[]){
    fprintf(FP,"\n#include \"%s\"\n", gheader);
   }
   system("rm -f global.h");
+  
+
+  // if(isGPU) {
+  //   insert_graph_node(); // insert GPU graph node;
+  //   // convert_to_gpu(); // converts parameter of kernels to GPU variable type
+  //   // get_variables();  // converts global variables
+  // }
+  get_variables(isGPU, cpuParallelSection);
+
   if(GALOIS_FLAG==0){
     for(int ii=0;ii<TOT_GPU_GRAPH;ii++)fprintf(FP1,"cudaDeviceProp prop%d;\n",ii);
     if(GPUCODEFLAG){
@@ -2468,13 +2477,6 @@ int main(int argc, char *argv[]){
     fprintf(FP,"#include \"../include/HGraph.h\"\n");
     fprintf(FP,"#include \"../include/HSet.h\"\n");
   }
-
-  // if(isGPU) {
-  //   insert_graph_node(); // insert GPU graph node;
-  //   // convert_to_gpu(); // converts parameter of kernels to GPU variable type
-  //   // get_variables();  // converts global variables
-  // }
-  get_variables(isGPU, cpuParallelSection);
 
   temp->print();
   setparent();
