@@ -1646,6 +1646,7 @@ void statement::codeGen(FILE *FP1) {
             fgetpos(FP1, &position);
         }
         tree_typedecl *x1=this->stdecl->lhs;
+
         if(x1->libdatatype!=-1 && !(this->stdecl!=NULL && this->stdecl->dirrhs!=NULL &&this->stdecl->dirrhs->procd==1)) {
 
             if(x1->libdatatype==GRAPH_TYPE) {

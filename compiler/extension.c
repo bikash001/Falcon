@@ -300,6 +300,7 @@ void convert_vertex_edge()
 					right->prev = end_stmt;
 					end_stmt->sttype = EBLOCK_STMT;
 				}
+
 				replace_functions(target->prev, target->prev->end_stmt, pointA, pointB, d);
 			}
 		} else if (CONVERT_VERTEX_EDGE==2 && forstmt->itr == EDGES_ITYPE) {
@@ -310,7 +311,7 @@ void convert_vertex_edge()
 
         	statement *function = get_function(forstmt->stassign->rhs->name);
         	if(function == NULL) {
-				fprintf(stderr, "Error: function %s not defined.\n", forstmt->stassign->rhs->name);
+				fprintf(stderr, "Error-313: function %s not defined.\n", forstmt->stassign->rhs->name);
 				exit(0);
 			}
 
@@ -454,7 +455,7 @@ static void change_cpu_graph(statement *forstmt, dir_decl *gpu_graph)
 
 	statement *target = get_function(forstmt->stassign->rhs->name);
 	if(target == NULL) {
-		fprintf(stderr, "Error: function %s not defined.\n", forstmt->stassign->rhs->name);
+		fprintf(stderr, "Error-457: function %s not defined.\n", forstmt->stassign->rhs->name);
 		exit(0);
 	}
 	target->ker = 1;	// set function to kernel
@@ -604,17 +605,29 @@ static void get_variables_util(set<dir_decl *> &local_set, set<dir_decl *> &glob
 
 							statement *target = get_function(astmt->rhs->name);
 							if(target == NULL) {
-								fprintf(stderr, "Error: function %s not defined.\n", astmt->rhs->name);
-								exit(0);
+								get_variables_util_exp(local_set, global_wset, astmt->rhs);
+								// assign_stmt *tastmt = astmt->rhs->arglist;
+								// while(tastmt) {
+								// 	if(tastmt->lhs) {
+								// 		get_variables_util_exp(local_set, global_wset, tastmt->lhs);
+								// 	}
+								// 	if(tastmt->rhs) {
+								// 		get_variables_util_exp(local_set, global_wset, tastmt->rhs);
+								// 	}
+								// 	tastmt = tastmt->next;
+								// }
+								fprintf(stderr, "Error-618: function %s not defined.\n", astmt->rhs->name);
+								// exit(0);
+							} else {
+								tree_decl_stmt *params = target->stdecl->dirrhs->params;
+								
+								std::set<dir_decl *> lset;
+								while(params) {
+									lset.insert(params->dirrhs);
+									params = params->next;
+								}
+								get_variables_util(lset, global_rset, global_wset, target->next->next, target->end_stmt, visited);
 							}
-							tree_decl_stmt *params = target->stdecl->dirrhs->params;
-							
-							std::set<dir_decl *> lset;
-							while(params) {
-								lset.insert(params->dirrhs);
-								params = params->next;
-							}
-							get_variables_util(lset, global_rset, global_wset, target->next->next, target->end_stmt, visited);
 						} else {
 							get_variables_util_exp(local_set, global_rset, astmt->rhs);
 						}
@@ -1046,23 +1059,25 @@ static void find_properties(map<dir_decl*, set<char*, comparator> > &rmp, map<di
 						// printf("TEST-590 %s\n", astmt->rhs->name);
 
 						statement *target = get_function(astmt->rhs->name);
-						if(target == NULL) {
-							fprintf(stderr, "Error: function %s not defined.\n", astmt->rhs->name);
-							exit(0);
-						}
-						tree_decl_stmt *params = target->stdecl->dirrhs->params;
-						
-						dir_decl *gp = NULL;
-						while(params) {
-							if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
-								gp = params->dirrhs;
+						if(target == NULL) { // may be library function
+							fprintf(stderr, "Error-1062: function %s not defined.\n", astmt->rhs->name);
+							walk_find_prop(wmp, astmt->rhs, dg);
+							// exit(0);
+						} else {
+							tree_decl_stmt *params = target->stdecl->dirrhs->params;
+							
+							dir_decl *gp = NULL;
+							while(params) {
+								if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
+									gp = params->dirrhs;
+								}
+								params = params->next;
 							}
-							params = params->next;
-						}
 
-						find_properties(rmp, wmp, target->next->next, target->end_stmt, gp, visited);
-						replace_map_variables(rmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
-						replace_map_variables(wmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+							find_properties(rmp, wmp, target->next->next, target->end_stmt, gp, visited);
+							replace_map_variables(rmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+							replace_map_variables(wmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+						}
 					} else {
 						walk_find_prop(rmp, astmt->rhs, dg);
 					}
@@ -1157,17 +1172,18 @@ static void find_var_prop_pair(statement *begin, set<statement*> &visited, vecto
 
 						statement *target = get_function(astmt->rhs->name);
 						if(target == NULL) {
-							fprintf(stderr, "Error: function %s not defined.\n", astmt->rhs->name);
-							exit(0);
-						}
-						tree_decl_stmt *params = target->stdecl->dirrhs->params;
-						
-						dir_decl *gp = NULL;
-						while(params) {
-							if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
-								gp = params->dirrhs;
+							fprintf(stderr, "Error-1174: function %s not defined.\n", astmt->rhs->name);
+							// exit(0);
+						} else {
+							tree_decl_stmt *params = target->stdecl->dirrhs->params;
+							
+							dir_decl *gp = NULL;
+							while(params) {
+								if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
+									gp = params->dirrhs;
+								}
+								params = params->next;
 							}
-							params = params->next;
 						}
 
 						// find_var_prop_pair(target->next->next, visited, attr_pair);
@@ -1580,7 +1596,8 @@ static void replace(map<dir_decl*, dir_decl*> &tab, map<dir_decl*, statement*> &
 	}
 }
 
-static void insert_node(map<dir_decl*, dir_decl*> &tab, map<dir_decl*, statement*> &mp, LIBDATATYPE dtype)
+
+static void insert_node(map<dir_decl*, dir_decl*> &tab, map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &graph_info, map<dir_decl*, statement*> &mp, LIBDATATYPE dtype)
 {
 	for(map<dir_decl*, statement*>::iterator itr=mp.begin(); itr!=mp.end(); ++itr) {
 		statement *st = itr->second;
@@ -1595,7 +1612,13 @@ static void insert_node(map<dir_decl*, dir_decl*> &tab, map<dir_decl*, statement
 			ptr->libdatatype = tp->libdatatype;
 			ptr->name = tp->name;
 			// ptr->ppts = tab[tp->d1]->ppts;
-			ptr->d1 = tab[tp->d1];
+			ptr->d1 = NULL;
+			for(map<dir_decl*, set<char*, comparator> >::iterator kk=graph_info[tp->d1].begin(); kk!=graph_info[tp->d1].end(); ++kk) {
+				if(kk->first->gpu == 1) {
+					ptr->d1 = kk->first; // graph in which this set is related to ~ need modification for multiple graph
+					break;
+				}
+			}
 			// ptr->ppts = NULL;
 			// ptr->d1 = tp->d1;
 			ptr->next = tp->next;	
@@ -1624,6 +1647,8 @@ static void insert_node(map<dir_decl*, dir_decl*> &tab, map<dir_decl*, statement
 			stmt->sttype = DECL_STMT;
 	  		stmt->stdecl = tstmt;
 	  		insert_statement(st, stmt, st->next);
+	  		stmt->lineno = 99999;
+	  		// dd->tp1->d1->gpu==1;
 
 	  		statement *astmt = create_assign_statement(dd, itr->first);
 	  		insert_statement(stmt, astmt, stmt->next);
@@ -1748,8 +1773,9 @@ static void insert_graph_node(map<dir_decl*, map<dir_decl*, set<char*, comparato
 		}
 	}
 
-	// insert_node(tab, fx_sets, SET_TYPE);	// replace cpu sets by gpu sets
-	// replace(tab, fx_sets);
+	map<dir_decl*, dir_decl*> stab;
+	insert_node(stab, tab, fx_sets, SET_TYPE);	// replace cpu sets by gpu sets
+	replace(stab, fx_sets);
 
 	// tab.clear();
 	// insert_node(tab, fx_collections, COLLECTION_TYPE);	// replace cpu collection by gpu collection
@@ -2029,7 +2055,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 			char *name = stmt->stassign->rhs->name;
 			statement *target = get_function(name);
 			if(target == NULL) {
-				fprintf(stderr, "Error: function %s not defined.\n", name);
+				fprintf(stderr, "Error-2047: function %s not defined.\n", name);
 				exit(0);
 			}
 			tree_decl_stmt *params = target->stdecl->dirrhs->params;

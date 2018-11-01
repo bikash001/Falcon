@@ -2485,6 +2485,7 @@ int main(int argc, char *argv[]){
 
   if(CONVERT_VERTEX_EDGE) {
     // falcon extension code
+    fprintf(stderr, "%s\n", "Converting vertex to edge based.");
     convert_vertex_edge();
   }
 
