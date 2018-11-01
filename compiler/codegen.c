@@ -36,7 +36,7 @@ int merge_bracket = 0;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 char *vb_forcondarr = NULL;    // stores condition in conditional foreach for vertex based
 extern int stream_count;
-
+extern bool OMP_NESTED;
 
 void findstructref(dir_decl *d1,tree_expr *expr) {
     if(expr->expr_type==STRUCTREF) {
@@ -307,7 +307,9 @@ void statement::codeGen(FILE *FP1) {
 //fprintf(FP1,"Galois::StatManager statManager;\n");
                 fprintf(FP1,"int argct1= argc > 4 ?4:argc;\n  LonestarStart(argct1,argv,name,desc,url);\n");
             } else {
-
+            	if(OMP_NESTED) {
+            		fprintf(FP1, "%s\n", "\tomp_set_dynamic(0);\n\tomp_set_nested(1);");
+            	}
                 for(int ii=0; ii<TOT_GPU_GRAPH; ii++)fprintf(FP1,"\ncudaGetDeviceProperties(&prop%d,%d);",ii,ii%4);
                 fprintf(FP1," \nalloc_sync_array();\n");
             }

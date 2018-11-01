@@ -87,6 +87,7 @@ dir_decl *insert_point = NULL;
 extern void insert_graph_node();
 extern std::map<dir_decl*, statement*> fx_sets, fx_collections;
 extern std::vector<statement*> sections_stmts;
+bool OMP_NESTED = false;
 
 %}
 %union {
@@ -2410,12 +2411,13 @@ int main(int argc, char *argv[]){
         CONVERT_VERTEX_EDGE = atoi(argv[temp+1]);
       } else if (!strcmp(argv[temp], "-gpu")) {
         isGPU = atoi(argv[temp+1]);
-      } else if(!strcmp(argv[temp], "-ps")) {
+      } else if(!strcmp(argv[temp], "-async")) {// asynchronous execution
         cpuParallelSection = atoi(argv[temp+1]);
       }
       temp=temp+2;
     }
   }
+
   dir_decl *d1=new dir_decl();
   d1->name=malloc(sizeof(char)*30);
   tree_typedecl *tt1=new tree_typedecl();
@@ -2489,6 +2491,10 @@ int main(int argc, char *argv[]){
     convert_vertex_edge();
   }
 
+  if(!isGPU && (cpuParallelSection || !sections_stmts.empty())) {
+    OMP_NESTED = true;
+  }
+  
   temp->codeGen1();
   for(int ii=1;ii<TOT_GPU_GRAPH;ii++)fprintf(FP,"cudaDeviceProp prop%d;\n",ii);
   printf("codegeneration done\n output files \n 1)%s\n %s\n %s \n",source,header,gheader);
