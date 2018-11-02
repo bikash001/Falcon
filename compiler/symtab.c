@@ -1936,7 +1936,7 @@ int print_gpu_if_stmt(statement *t1,int val) {
                 }
                 fprintf(FP1, "%s  falcvt%d;\n",dtypenames[t1->expr1->rhs->dtype],++Temp);
                 if(t1->expr1->lhs->expr_type==VAR) {
-                    fprintf(FP1,"/*TEST-4*/cudaSetDevice(%d);\n%scudaMemcpyFromSymbol(&(falcvt%d),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",t1->expr1->rhs->dev_no,cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-4*/cudaSetDevice(%d);\n%scudaMemcpyFromSymbol(&(falcvt%d),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",t1->expr1->lhs->lhs->dev_no,cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
                     t1->expr1->lhs->cpu_name=malloc((sizeof(char))*100);
                     sprintf(t1->expr1->lhs->cpu_name,"falcvt%d",Temp);
                     fprintf(FP1,"\nif(%s==",t1->expr1->lhs->cpu_name);
