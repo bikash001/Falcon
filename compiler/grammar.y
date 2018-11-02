@@ -2464,15 +2464,17 @@ int main(int argc, char *argv[]){
   get_variables(isGPU, cpuParallelSection);
 
   if(GALOIS_FLAG==0){
-    if(TOT_GPU_GRAPH < 1) {
+    if(isGPU && TOT_GPU_GRAPH < 1) {
       TOT_GPU_GRAPH = 1;
     }
     for(int ii=0;ii<TOT_GPU_GRAPH;ii++)fprintf(FP1,"cudaDeviceProp prop%d;\n",ii);
     if(GPUCODEFLAG){
       fprintf(FP," #include \"../GPU/generated/include/HGraph.h\"\n #include \"../GPU/generated/include/GGraph.cu\"\n#include \"../GPU/generated/include/thrust.cu\"\n #include \"../GPU/generated/include/HSetOPT.h\"\n #include<sys/time.h>\n#include </usr/local/cuda/include/cuda.h>\n #include </usr/local/cuda/include/cuda_runtime_api.h>\n#include<unistd.h>\n");
+      if(sections_stmts.size() > 0) {
+        fprintf(FP, "%s\n", "#include <omp.h>");
+      }
     }else {
       fprintf(FP," #include \"../CPU/generated/include/HGraph.h\"\n  #include \"../CPU/generated/include/HSetOPT.h\"\n #include<sys/time.h>\n#include<unistd.h>\n");
-
     }
   }
   else{
