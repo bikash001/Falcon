@@ -1883,7 +1883,7 @@ int print_gpu_if_stmt(statement *t1,int val) {
                         for(int i=-0; i<200; i++)arr1[i]=tarr[i];
                         if(gp_string[0]=='\0')fprintf(FP1,"/*HERE*/%scudaMemcpy((%s),(%s),sizeof(int)*%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
                         else {
-                            fprintf(FP1,"%scudaMemcpy((%s),(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                            fprintf(FP1,"/*TEST-1*/%scudaMemcpy((%s),(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
                         return;
@@ -1898,9 +1898,9 @@ int print_gpu_if_stmt(statement *t1,int val) {
                         if(t1->expr1->rhs&& t1->expr1->rhs->rhs)sprintf(temp,"n%s",t1->expr1->rhs->rhs->name);
                     }
                     if(te1!=NULL)sprintf(arr3,"%s.%s",te1->name,temp);
-                    if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
+                    if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-2*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
                     else {
-                        fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                        fprintf(FP1,"/*TEST-3*/%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                         for(int i=0; i<200; i++)gp_string[i]='\0';
                     }
                 }
@@ -1913,7 +1913,7 @@ int print_gpu_if_stmt(statement *t1,int val) {
             if(t1->expr1->lhs &&((dir_decl *)(t1->expr1->lhs->lhs))->ctype==CARR_TYPE) {
 
                 fprintf(FP1,"//array assign\n");
-                fprintf(FP1,"cudaMemcpy((void *)&");
+                fprintf(FP1,"/*TEST-40*/cudaMemcpy((void *)&");
                 t1->expr1->lhs->printcode(t1->expr1->lhs);
                 fprintf(FP1,",&");
                 t1->expr1->rhs->printcode(t1->expr1->rhs);
@@ -1936,7 +1936,7 @@ int print_gpu_if_stmt(statement *t1,int val) {
                 }
                 fprintf(FP1, "%s  falcvt%d;\n",dtypenames[t1->expr1->rhs->dtype],++Temp);
                 if(t1->expr1->lhs->expr_type==VAR) {
-                    fprintf(FP1,"%scudaMemcpyFromSymbol(&(falcvt%d),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-4*/cudaSetDevice(%d);\n%scudaMemcpyFromSymbol(&(falcvt%d),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",t1->expr1->rhs->dev_no,cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
                     t1->expr1->lhs->cpu_name=malloc((sizeof(char))*100);
                     sprintf(t1->expr1->lhs->cpu_name,"falcvt%d",Temp);
                     fprintf(FP1,"\nif(%s==",t1->expr1->lhs->cpu_name);
@@ -1969,16 +1969,16 @@ int print_gpu_if_stmt(statement *t1,int val) {
                             sprintf(tarr+5,"%s",p+1);//this changd made due to strstr in structref tree.c
                         }
                         for(int i=-0; i<200; i++)arr1[i]=tarr[i];
-                        if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&falcvt%d,&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                        if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-5*/%scudaMemcpy(&falcvt%d,&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
                         else {
-                            fprintf(FP1,"%scudaMemcpy(&falcvt%d,&(%s),sizeof(%s),cudaMemcpyHDeviceToHost)%s%d%s",cpy[0],Temp,arr1,gp_string,cpy[1],errcnt++,cpy[2]);
+                            fprintf(FP1,"/*TEST-6*/%scudaMemcpy(&falcvt%d,&(%s),sizeof(%s),cudaMemcpyHDeviceToHost)%s%d%s",cpy[0],Temp,arr1,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
                         fprintf(FP1,"if(falcvt%d==%s)\n",Temp,arr2);
                         if(t1->f1!=NULL)t1->f1->codeGen(FP1);
                         return;
                     }
-                    fprintf(FP1,"%scudaMemcpy(&falcvt%d,&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-7*/%scudaMemcpy(&falcvt%d,&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],Temp,arr1,dtypenames[t1->expr1->rhs->dtype],cpy[1],errcnt++,cpy[2]);
                     fprintf(FP1,"\nif(falcvt%d==",Temp);
                     t1->expr1->rhs->printcode(t1->expr1->rhs);
                     fprintf(FP1,")");
@@ -2026,9 +2026,9 @@ int print_gpu_if_stmt(statement *t1,int val) {
                         if(t1->expr1->lhs->libdtype==7)strcpy(temp,"npoints");
                         if(t1->expr1->lhs->libdtype==6)strcpy(temp,"nedges");
                         sprintf(arr3,"%s.%s",te1->name,temp);
-                        if(gp_string[0]=='\0')fprintf(FP1,"/*HERE*/%scudaMemcpy((%s),(%s),sizeof(int)*%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
+                        if(gp_string[0]=='\0')fprintf(FP1,"/*HERE-1*/%scudaMemcpy((%s),(%s),sizeof(int)*%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
                         else {
-                            fprintf(FP1,"%scudaMemcpy((%s),(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                            fprintf(FP1,"/*TEST-8*/%scudaMemcpy((%s),(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
                         return;
@@ -2037,9 +2037,9 @@ int print_gpu_if_stmt(statement *t1,int val) {
                     if(t1->expr1->lhs->libdtype==7)strcpy(temp,"npoints");
                     if(t1->expr1->lhs->libdtype==6)strcpy(temp,"nedges");
                     sprintf(arr3,"%s.%s",te1->name,temp);
-                    if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
+                    if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-9*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
                     else {
-                        fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                        fprintf(FP1,"/*TEST-10*/%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                         for(int i=0; i<200; i++)gp_string[i]='\0';
                     }
                 }
@@ -2064,16 +2064,16 @@ int print_gpu_if_stmt(statement *t1,int val) {
                     sprintf(tarr+6,p+1);
                 }
                 for(int i=-0; i<200; i++)arr2[i]=tarr[i];
-                if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->expr1->lhs->dtype],cpy[1],errcnt++,cpy[2]);
+                if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-11*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->expr1->lhs->dtype],cpy[1],errcnt++,cpy[2]);
                 else {
-                    fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-12*/%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                     for(int i=0; i<200; i++)gp_string[i]='\0';
                 }
                 return;
             }
             if(t1->expr1->lhs->expr_type==VAR && t1->expr1->lhs->lhs->ptrflag==0)fprintf(FP1,"%scudaMemcpyFromSymbol(&(%s),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->expr1->lhs->dtype],cpy[1],errcnt++,cpy[2]);
             else {
-                fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->expr1->lhs->dtype],cpy[1],errcnt++,cpy[2]);
+                fprintf(FP1,"/*TEST-13*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->expr1->lhs->dtype],cpy[1],errcnt++,cpy[2]);
 
             }
         }
@@ -2152,12 +2152,12 @@ int print_gpu_assign_stmt(statement *t1,int val) {
 
                                 }
                                 fprintf(FP1,"temp%d.n%s=(( %s *)(%s.extra))->n%s;\n",extemp,ppts->name,d2->extra_name,arr2,ppts->name);
-                                fprintf(FP1,"cudaMemcpyToSymbol(falc%s%s,&((( %s *)(%s.extra))->n%s),sizeof(int),0,cudaMemcpyHostToDevice);\n",d1->name,ppts->name,d2->extra_name,d2->name,ppts->name);
+                                fprintf(FP1,"/*TEST-14*/cudaMemcpyToSymbol(falc%s%s,&((( %s *)(%s.extra))->n%s),sizeof(int),0,cudaMemcpyHostToDevice);\n",d1->name,ppts->name,d2->extra_name,d2->name,ppts->name);
                             }
                             ppts=ppts->next;
                         }
                         if(flag==1) {
-                            fprintf(FP1,"%scudaMemcpy(%s.extra,&temp%d,sizeof(%s),cudaMemcpyHostToDevice)%s%d%s\n%sflag=1;",cpy[0],d1->name,extemp,d1->extra_name,cpy[1],errcnt++,cpy[2],d1->name);
+                            fprintf(FP1,"/*TEST-15*/%scudaMemcpy(%s.extra,&temp%d,sizeof(%s),cudaMemcpyHostToDevice)%s%d%s\n%sflag=1;",cpy[0],d1->name,extemp,d1->extra_name,cpy[1],errcnt++,cpy[2],d1->name);
 
                         }
                         extemp++;
@@ -2238,9 +2238,9 @@ int print_gpu_assign_stmt(statement *t1,int val) {
 
 //fprintf(FP1,"//%s \n",t1->stassign->lhs->rhs->name);;
                         }
-                        if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy((%s),(%s),sizeof(%s)*%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr4,arr3,cpy[1],errcnt++,cpy[2]);
+                        if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-16*/%scudaMemcpy((%s),(%s),sizeof(%s)*%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr4,arr3,cpy[1],errcnt++,cpy[2]);
                         else {
-                            fprintf(FP1,"%scudaMemcpy((%s),(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                            fprintf(FP1,"/*TEST-17*/%scudaMemcpy((%s),(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
                         return 0;
@@ -2255,9 +2255,9 @@ int print_gpu_assign_stmt(statement *t1,int val) {
                         if(t1->stassign->rhs&& t1->stassign->rhs->rhs)sprintf(temp,"n%s",t1->stassign->rhs->rhs->name);
                     }
                     if(te1!=NULL)sprintf(arr3,"%s.%s",te1->name,temp);
-                    if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
+                    if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-18*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
                     else {
-                        fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                        fprintf(FP1,"/*TEST-19*/%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                         for(int i=0; i<200; i++)gp_string[i]='\0';
                     }
                 }
@@ -2269,7 +2269,7 @@ int print_gpu_assign_stmt(statement *t1,int val) {
             for(int ii=0; ii<100; ii++)arr1[ii]=arr2[ii]='\0';
             t1->stassign->lhs->printcode1(t1->stassign->lhs,arr1);
             t1->stassign->rhs->printcode1(t1->stassign->rhs,arr2);
-            fprintf(FP1,"cudaMemcpy(%s,&%s,sizeof(int),cudaMemcpyHostToDevice);\n",arr1,arr2);
+            fprintf(FP1,"/*TEST-32*/cudaMemcpy(%s,&%s,sizeof(int),cudaMemcpyHostToDevice);\n",arr1,arr2);
             return 0;
         }
         if(t1->stassign->rhs->dtype>=0 && t1->stassign->rhs->dtype==11) {
@@ -2279,7 +2279,7 @@ int print_gpu_assign_stmt(statement *t1,int val) {
 
             if(t1->stassign->lhs &&((dir_decl *)(t1->stassign->lhs->lhs))->ctype==CARR_TYPE) {
 
-                fprintf(FP1,"cudaMemcpy((void *)&");
+                fprintf(FP1,"/*TEST-33*/cudaMemcpy((void *)&");
                 t1->stassign->lhs->printcode(t1->stassign->lhs);
                 fprintf(FP1,",&");
                 t1->stassign->rhs->printcode(t1->stassign->rhs);
@@ -2310,7 +2310,7 @@ int print_gpu_assign_stmt(statement *t1,int val) {
                 fprintf(FP1,"falcvt%d=",Temp);
                 t1->stassign->rhs->printcode(t1->stassign->rhs);
                 fprintf(FP1,";\n");
-                if(t1->stassign->lhs->expr_type==VAR)fprintf(FP1,"%scudaMemcpyToSymbol(%s,&(falcvt%d),sizeof(%s),0,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                if(t1->stassign->lhs->expr_type==VAR)fprintf(FP1,"/*TEST-20 %s*/cudaSetDevice(%d);\n%scudaMemcpyToSymbol(%s,&(falcvt%d),sizeof(%s),0,cudaMemcpyHostToDevice)%s%d%s",t1->stassign->lhs->lhs->name,t1->stassign->lhs->lhs->dev_no,cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
                 else {
                     if(gpcopy_string[0]!='\0') {
                         fprintf(FP1,"%s",gpcopy_string);
@@ -2338,14 +2338,14 @@ int print_gpu_assign_stmt(statement *t1,int val) {
                             sprintf(tarr+5,"%s",p+1);//this changd made due to strstr in structref tree.c
                         }
                         for(int i=-0; i<200; i++)arr1[i]=tarr[i];
-                        if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(falcvt%d),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                        if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-21*/%scudaMemcpy(&(%s),&(falcvt%d),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
                         else {
-                            fprintf(FP1,"%scudaMemcpy(&(%s),&(falcvt%d),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,gp_string,cpy[1],errcnt++,cpy[2]);
+                            fprintf(FP1,"/*TEST-22*/%scudaMemcpy(&(%s),&(falcvt%d),%s,cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,gp_string,cpy[1],errcnt++,cpy[2]);
                             for(int i=0; i<200; i++)gp_string[i]='\0';
                         }
                         return 0;
                     }
-                    fprintf(FP1,"%scudaMemcpy(&(%s),&(falcvt%d),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-23*/%scudaMemcpy(&(%s),&(falcvt%d),sizeof(%s),cudaMemcpyHostToDevice)%s%d%s",cpy[0],arr1,Temp,dtypenames[t1->stassign->rhs->dtype],cpy[1],errcnt++,cpy[2]);
 
                 }
             }
@@ -2413,9 +2413,9 @@ int print_gpu_assign_stmt(statement *t1,int val) {
 
 //fprintf(FP1,"//%s \n",t1->stassign->lhs->rhs->name);;
                     }
-                    if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy((%s),(%s),sizeof(%s)*%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr4,arr3,cpy[1],errcnt++,cpy[2]);
+                    if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-24*/%scudaMemcpy((%s),(%s),sizeof(%s)*%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr4,arr3,cpy[1],errcnt++,cpy[2]);
                     else {
-                        fprintf(FP1,"%scudaMemcpy((%s),(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                        fprintf(FP1,"/*TEST-25*/%scudaMemcpy((%s),(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                         for(int i=0; i<200; i++)gp_string[i]='\0';
                     }
                     return 0;
@@ -2424,9 +2424,9 @@ int print_gpu_assign_stmt(statement *t1,int val) {
                 if(t1->stassign->lhs->libdtype==7)strcpy(temp,"npoints");
                 if(t1->stassign->lhs->libdtype==6)strcpy(temp,"nedges");
                 sprintf(arr3,"%s.%s",te1->name,temp);
-                if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
+                if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-26*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,arr3,cpy[1],errcnt++,cpy[2]);
                 else {
-                    fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-27*/%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                     for(int i=0; i<200; i++)gp_string[i]='\0';
                 }
             }
@@ -2437,7 +2437,7 @@ int print_gpu_assign_stmt(statement *t1,int val) {
             for(int ii=0; ii<100; ii++)arr1[ii]=arr2[ii]='\0';
             t1->stassign->lhs->printcode1(t1->stassign->lhs,arr1);
             t1->stassign->rhs->printcode1(t1->stassign->rhs,arr2);
-            fprintf(FP1,"cudaMemcpy(&%s,%s,sizeof(%s),cudaMemcpyDeviceToHost);\n",arr1,arr2,dtypenames[t1->stassign->lhs->dtype]);
+            fprintf(FP1,"/*TEST-28*/cudaMemcpy(&%s,%s,sizeof(%s),cudaMemcpyDeviceToHost);\n",arr1,arr2,dtypenames[t1->stassign->lhs->dtype]);
             return 0;
         }
         if(t1->stassign->lhs->dtype>=0) {
@@ -2469,16 +2469,16 @@ int print_gpu_assign_stmt(statement *t1,int val) {
                     sprintf(tarr+6,p+1);
                 }
                 for(int i=-0; i<200; i++)arr2[i]=tarr[i];
-                if(gp_string[0]=='\0')fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->stassign->lhs->dtype],cpy[1],errcnt++,cpy[2]);
+                if(gp_string[0]=='\0')fprintf(FP1,"/*TEST-29*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->stassign->lhs->dtype],cpy[1],errcnt++,cpy[2]);
                 else {
-                    fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
+                    fprintf(FP1,"/*TEST-30*/%scudaMemcpy(&(%s),&(%s),%s,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,gp_string,cpy[1],errcnt++,cpy[2]);
                     for(int i=0; i<200; i++)gp_string[i]='\0';
                 }
                 return 0;
             }
             if(t1->stassign->lhs->expr_type==VAR && t1->stassign->lhs->lhs->ptrflag==0)fprintf(FP1,"%scudaMemcpyFromSymbol(&(%s),%s,sizeof(%s),0,cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->stassign->lhs->dtype],cpy[1],errcnt++,cpy[2]);
             else {
-                fprintf(FP1,"%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->stassign->lhs->dtype],cpy[1],errcnt++,cpy[2]);
+                fprintf(FP1,"/*TEST-31*/%scudaMemcpy(&(%s),&(%s),sizeof(%s),cudaMemcpyDeviceToHost)%s%d%s",cpy[0],arr1,arr2,dtypenames[t1->stassign->lhs->dtype],cpy[1],errcnt++,cpy[2]);
 
             }
         }

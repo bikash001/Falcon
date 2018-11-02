@@ -771,7 +771,7 @@ void statement::codeGen(FILE *FP1) {
                                 fprintf(fp1,"__device__ int falc%spoint,falc%sedge;\n",t1->name,t1->name);
                                 fprintf(FP,"__device__ int falc%saddpointgraph(){\n int t1=atomicAdd(&falc%spoint,1);\n return t1;\n}\n",t1->name,t1->name);
                                 fprintf(FP,"__device__ int falc%saddedgegraph(){\n int t1=atomicAdd(&falc%sedge,1);\n return t1;\n}\n",t1->name,t1->name);
-                                fprintf(FP,"void alloc_extra_%s(GGraph &%s,int flag,int npoints) {/*\ncudaSetDevice(%d);*/\n ",t1->name,t1->name,t1->dev_no);
+                                fprintf(FP,"void alloc_extra_%s(GGraph &%s,int flag,int npoints) {\ncudaSetDevice(%d);\n ",t1->name,t1->name,t1->dev_no);
                                 t1->extra_fun=(char *)malloc(sizeof(char)*100);
                                 sprintf(t1->extra_fun,"alloc_extra_%s(%s,%sflag,%s.npoints);",t1->name,t1->name,t1->name,t1->name);
                             }
@@ -831,7 +831,7 @@ void statement::codeGen(FILE *FP1) {
                                 ep=ep->next;
                             }
                             if(t1->gpu==1 && t1->ppts!=NULL) {
-                                fprintf(FP,"%*s""%scudaMemcpy(%s.extra,&temp,sizeof(%s),cudaMemcpyHostToDevice)!=cudaSuccess) {\n",indent," ",cpy[0],t1->name,t1->extra_name);
+                                fprintf(FP,"%*s""cudaSetDevice(%d);\n%scudaMemcpy(%s.extra,&temp,sizeof(%s),cudaMemcpyHostToDevice)!=cudaSuccess) {\n",indent," ",t1->dev_no,cpy[0],t1->name,t1->extra_name);
                                 fprintf(FP,"%*s""\tprintf(\"memcpyerror %d%s\n",indent*2," ",errcnt++,cpy[2]);
                             }
                             fprintf(FP,"%*s""cudaSetDevice(0);\n}\n",indent," ");

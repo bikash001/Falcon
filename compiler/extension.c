@@ -1280,8 +1280,8 @@ static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<
 		}
 
 		for(map<dir_decl*, set<char*, comparator> >::iterator jj=gps.begin(); jj!=gps.end(); ++jj) {
-			count += sprintf(buff+count, "cudaMemcpy(&%s, (struct struct_%s *)(%s.extra), sizeof(struct struct_%s ),cudaMemcpyDeviceToHost);\n", 
-				var_name, it->first->name, jj->first->name, it->first->name);
+			count += sprintf(buff+count, "cudaSetDevice(%d);\ncudaMemcpy(&%s, (struct struct_%s *)(%s.extra), sizeof(struct struct_%s ),cudaMemcpyDeviceToHost);\n", 
+				jj->first->dev_no, var_name, it->first->name, jj->first->name, it->first->name);
 			char *type, size[10];
 
 			for(set<char*, comparator>::iterator ii=jj->second.begin(); ii!=jj->second.end(); ++ii) {
@@ -2316,7 +2316,19 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				// }
 				// wmp.clear();
 				// rmp.clear();
-				
+
+				set<dir_decl*> vset;
+				set<statement*> visited;
+				set<dir_decl*> local_set;
+				get_variables_util(local_set, vset, vset, curr->next, curr->end_stmt, visited);
+				set<dir_decl*>::iterator jj;
+				for(set<dir_decl*>::iterator kk=vset.begin(); kk!=vset.end(); ++kk) {
+					jj = gset.find(*kk);
+					if(jj != gset.end()) {
+						(*jj)->dev_no = dev_no;
+					}
+				}
+
 				dev_no++;
 				curr = curr->end_stmt->next;
 				if(dev_no > TOT_GPU_GRAPH) {

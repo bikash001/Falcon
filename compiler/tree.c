@@ -1159,7 +1159,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     char temp[50];
                     if(d1->gpu==1) {
                         for(int i=0; i<300; i++)gpcopy_string[i]='\0';
-                        sprintf(gpcopy_string,"%s temp%d;\n cudaMemcpy(&temp%d,((%s *)(%s.extra)),sizeof(%s),cudaMemcpyDeviceToHost);\n",d1->extra_name,extemp,extemp,d1->extra_name,d1->name,d1->extra_name);
+                        sprintf(gpcopy_string,"%s temp%d;\n /*TREE-1*/cudaSetDevice(%d);\ncudaMemcpy(&temp%d,((%s *)(%s.extra)),sizeof(%s),cudaMemcpyDeviceToHost);\n",d1->extra_name,extemp,d1->dev_no,extemp,d1->extra_name,d1->name,d1->extra_name);
                         //printf("%s ",gpcopy_string);
                     }
                     for(int i=0; i<50; i++)temp[i]='\0';
