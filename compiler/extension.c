@@ -847,6 +847,7 @@ static void walk_find_prop(map<dir_decl*, set<char*, comparator> > &mp, tree_exp
 					// set<char*, comparator> *v = mp[temp];
 					// v->insert(expr->rhs->name);
 					mp[temp].insert(expr->rhs->name);
+				
 				}
 			}
 		}
@@ -2020,7 +2021,9 @@ static void find_attrs_in_kernel(map<dir_decl*, set<char*, comparator> > &rmp, m
 				exit(1);
 			}
 			find_properties(rmp, wmp, target->next->next, target->end_stmt, d, visited);
-			
+			replace_map_variables(rmp, target->stdecl->dirrhs->params, astmt);
+			replace_map_variables(wmp, target->stdecl->dirrhs->params, astmt);
+				
 			break;
 		}
 		astmt = astmt->next;
