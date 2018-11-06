@@ -2106,7 +2106,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				map<dir_decl*, set<char*, comparator> > crmap, cwmap;
 				if(rm) {
 					visited.clear();
-					find_properties(crmap, cwmap, stmt, end, NULL, visited);
+					find_properties(crmap, cwmap, stmt->next, end, NULL, visited);
 					
 					if(is_dependency(krmap, cwmap) || is_dependency(crmap, kwmap)) { // dependency exist
 						rm = false;
