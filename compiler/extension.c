@@ -1854,7 +1854,7 @@ static void replace_map_variables(map<dir_decl*, set<char*, comparator> > &tab, 
 		if(args->rhs->lhs->libdtype == GRAPH_TYPE && params->dirrhs->libdtype == GRAPH_TYPE) {
 			if(tab.find(args->rhs->lhs) == tab.end()) {
 				if(tab.find(params->dirrhs) != tab.end()) {
-					tab[args->rhs->lhs] = tab[params->dirrhs];
+					tab[args->rhs->lhs].insert(tab[params->dirrhs].begin(), tab[params->dirrhs].end());
 					tab.erase(params->dirrhs);
 				}
 			} else if(tab.find(params->dirrhs) != tab.end()) {
@@ -1882,12 +1882,12 @@ static void check_null(map<dir_decl*, set<char*, comparator>*> &tab, int k)
 	}
 }
 
-static void print(map<dir_decl*, set<char*, comparator>*> &tab, string ss)
+static void print(map<dir_decl*, set<char*, comparator> > &tab, string ss)
 {
 	cout << "*******" << ss << "*******" << endl;
-	for(map<dir_decl*, set<char*, comparator>*>::iterator ii=tab.begin(); ii!=tab.end(); ++ii) {
+	for(map<dir_decl*, set<char*, comparator> >::iterator ii=tab.begin(); ii!=tab.end(); ++ii) {
 		cout << "SET " << ii->first->name << endl;
-		for(set<char*, comparator>::iterator jj=ii->second->begin(); jj!=ii->second->end(); ++jj) {
+		for(set<char*, comparator>::iterator jj=ii->second.begin(); jj!=ii->second.end(); ++jj) {
 			cout << *jj << endl;
 		}
 	}
@@ -2250,8 +2250,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				// 		wmp.insert(pair<dir_decl*, set<char*, comparator> >(it1->first, it1->second));
 				// 	}
 				// }
-
-				copy(wmp, rmp);
+				copy(rmp, wmp);
 				
 				// replace graph used in each section by new gpu graph
 				for(map<dir_decl*, set<char*, comparator> >::iterator it1=wmp.begin(); it1!=wmp.end(); ++it1) {
@@ -2352,7 +2351,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				find_attrs_in_kernel(rmp, wmp, kers, *end);
 			}
 		}
-		copy(wmp, rmp);
+		copy(rmp, wmp);
 		for(map<dir_decl*, set<char*, comparator> >::iterator it1=wmp.begin(); it1!=wmp.end(); ++it1) {
 			kk = tab.find(it1->first);
 			dir_decl *dn = NULL;
