@@ -1911,7 +1911,7 @@ static void insert_parallel_section(vector<statement*> &kernels, int start, int 
 	int count = end - start;
 	statement *stmt = create_empty_stmt(2);
 	char *buff = new char[100];
-	snprintf(buff, 100, "#pragma omp sections num_threads(2) \n{\n#pragma omp section\n{\n");
+	snprintf(buff, 100, "#pragma omp parallel sections num_threads(2) \n{\n#pragma omp section\n{\n");
 	stmt->name = create_string(buff);
 	insert_statement(kernels[start]->prev, stmt, kernels[start]);
 	for(int i=start+1; i<=end; ++i) {
@@ -1922,7 +1922,7 @@ static void insert_parallel_section(vector<statement*> &kernels, int start, int 
 	
 		if(i != end) {
 			stmt = create_empty_stmt(2);
-			snprintf(buff, 100, "#pragma omp sections num_threads(2)\n{\n#pragma omp section\n{\n");
+			snprintf(buff, 100, "#pragma omp parallel sections num_threads(2)\n{\n#pragma omp section\n{\n");
 			stmt->name = create_string(buff);
 			insert_statement(kernels[i]->prev, stmt, kernels[i]);
 		}
