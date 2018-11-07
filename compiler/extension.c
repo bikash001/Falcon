@@ -899,6 +899,7 @@ static void walk_find_var_prop_pair(tree_expr *expr, vector<pair<tree_expr*, cha
 		if(expr->lhs->lhs->expr_type == VAR && expr->lhs->lhs->lhs->libdtype == GRAPH_TYPE) {
 			if(expr->lhs->rhs->expr_type == ARRREF) {
 				if(expr->rhs->expr_type == VAR) {
+
 					attr_pair.push_back(pair<tree_expr*, char*>(expr->lhs->lhs, expr->rhs->name));
 				}
 			}
@@ -1834,12 +1835,13 @@ static bool is_dependency(map<dir_decl*, set<char*, comparator> > &rmap, map<dir
 	return false;
 }
 
+// copy rhs to lhs
 static void copy(map<dir_decl*, set<char*, comparator> > &lhs, map<dir_decl*, set<char*, comparator> > &rhs)
 {
 	for(map<dir_decl*, set<char*, comparator> >::iterator ii=rhs.begin(); ii!=rhs.end(); ++ii) {
 		map<dir_decl*, set<char*, comparator> >::iterator jj = lhs.find(ii->first);
 		if(jj != lhs.end()) {
-			ii->second.insert(jj->second.begin(), jj->second.end());
+			jj->second.insert(ii->second.begin(), ii->second.end());
 		} else {
 			lhs[ii->first] = ii->second;
 		}
@@ -1882,11 +1884,11 @@ static void check_null(map<dir_decl*, set<char*, comparator>*> &tab, int k)
 	}
 }
 
-static void print(map<dir_decl*, set<char*, comparator> > &tab, string ss)
+static void print(map<dir_decl*, set<char*, comparator> > &tab, dir_decl* ss)
 {
-	cout << "*******" << ss << "*******" << endl;
+	fprintf(stderr, "*******%s %p*******\n", ss->name, ss);
 	for(map<dir_decl*, set<char*, comparator> >::iterator ii=tab.begin(); ii!=tab.end(); ++ii) {
-		cout << "SET " << ii->first->name << endl;
+		fprintf(stderr, "SET %s %p\n", ii->first->name, ii->first);
 		for(set<char*, comparator>::iterator jj=ii->second.begin(); jj!=ii->second.end(); ++jj) {
 			cout << *jj << endl;
 		}
@@ -2250,7 +2252,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				// 		wmp.insert(pair<dir_decl*, set<char*, comparator> >(it1->first, it1->second));
 				// 	}
 				// }
-				copy(rmp, wmp);
+				copy(wmp, rmp);
 				
 				// replace graph used in each section by new gpu graph
 				for(map<dir_decl*, set<char*, comparator> >::iterator it1=wmp.begin(); it1!=wmp.end(); ++it1) {
@@ -2351,7 +2353,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 				find_attrs_in_kernel(rmp, wmp, kers, *end);
 			}
 		}
-		copy(rmp, wmp);
+		copy(wmp, rmp);
 		for(map<dir_decl*, set<char*, comparator> >::iterator it1=wmp.begin(); it1!=wmp.end(); ++it1) {
 			kk = tab.find(it1->first);
 			dir_decl *dn = NULL;

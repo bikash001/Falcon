@@ -986,11 +986,7 @@ void statement::codeGen(FILE *FP1) {
                             if(this->feb==0) {
                                 dir_decl *setvar=NULL;
                                 if(this->stassign!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
-                                    if(this->comma) {
-                                        fprintf(FP1,"#pragma omp parallel num_threads(FALC_THREADS)\n{\n#pragma omp for nowait\nfor(int i=0;i<%s.npoints;i++)%s(i,",d2->name,this->stassign->rhs->name);
-                                    } else {
-                                        fprintf(FP1,"#pragma omp parallel for   num_threads(FALC_THREADS)\nfor(int i=0;i<%s.npoints;i++)%s(i,",d2->name,this->stassign->rhs->name);
-                                    }
+                                    fprintf(FP1,"#pragma omp parallel for   num_threads(FALC_THREADS)\nfor(int i=0;i<%s.npoints;i++)%s(i,",d2->name,this->stassign->rhs->name);
                                     assign_stmt *ta=this->stassign->rhs->arglist;
                                     ta=ta->next;
                                     while(ta!=NULL && ta->next!=NULL) {
@@ -1006,11 +1002,7 @@ void statement::codeGen(FILE *FP1) {
                                         char temparr[200];
                                         for(int i=0; i<200; i++)temparr[i]='\0';
                                         ta->rhs->printcode1(ta->rhs,temparr);
-                                        if(this->comma) {
-                                            fprintf(FP1,"%s);\n}\n",temparr);
-                                        } else {
-                                            fprintf(FP1,"%s);",temparr);
-                                        }
+                                        fprintf(FP1,"%s);",temparr);
                                         if(ta->rhs->lhs && ta->rhs->lhs->libdtype==SET_TYPE )setvar=ta->rhs->lhs;
                                     }
 
