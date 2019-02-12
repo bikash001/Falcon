@@ -9,14 +9,6 @@ extern  std::map<char *,statement *>fnames;
 extern std::map<char *,statement *>fnamescond;
 extern char *libdtypenames[];
 
-tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype) {
-    tree_expr *expr=new tree_expr();
-    expr->lhs=lhs;
-    expr->rhs=rhs;
-    expr->expr_type=etype;
-    expr->nodetype=ntype;
-    return expr;
-}
 inline void  adddynamicproperty(tree_expr *t1, enum LIBDATATYPE x,assign_stmt *pt1) {
 
     struct extra_ppts *ep= new extra_ppts();
@@ -112,13 +104,7 @@ assign_stmt *createassign(enum ASSIGN_TYPE x) {
     ptr->asstype=x;
     return ptr;
 }
-assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs) {
-    assign_stmt *ptr=new assign_stmt();
-    ptr->asstype=x;
-    ptr->lhs=lhs;
-    ptr->rhs=rhs;
-    return ptr;
-}
+
 void linkstmt(statement **t1,statement *t2) {
     (*t1)->next=t2;
     t2->prev=(*t1);
@@ -151,14 +137,7 @@ tree_typedecl * createlibtypedef( enum LIBDATATYPE x, char *name) {
     }
     return ptr;
 }
-statement *createstmt(STMT_TYPE sttype,tree_expr *expr,char *name,int lineno) {
-    statement *ptr=new statement();
-    ptr->sttype=sttype;
-    ptr->expr1=expr;
-    ptr->name=name;
-    ptr->lineno=lineno;
-    return ptr;
-}
+
 tree_typedecl *createcompounddef (enum DATATYPE x,char *name) {
     tree_typedecl *ptr=new tree_typedecl();
     ptr->datatype=x;
@@ -168,22 +147,7 @@ tree_typedecl *createcompounddef (enum DATATYPE x,char *name) {
     return ptr;
 
 }
-tree_expr *funcallpostfix(tree_expr *t1,enum EXPR_TYPE type,int kernel, tree_expr  *arglist) {
-    t1->expr_type=type;
-    t1->kernel=kernel;
-    if(arglist!=NULL) {
-        t1->arglist=new assign_stmt();
-        t1->arglist->lhs=NULL;
-        t1->arglist->rhs=arglist;
-        assign_stmt *ass=t1->arglist;
-        while(ass!=NULL) {
-            dir_decl *d1=ass->rhs->lhs;
-            if(d1!=NULL)d1->isparam=true;
-            ass=ass->next;
-        }
-    }
-    return t1;
-}
+
 tree_decl_stmt *createdeclstmt(class tree_typedecl *lhs,class tree_id *rhs,class dir_decl *dirrhs) {
     tree_decl_stmt *ptr=new tree_decl_stmt();
     ptr->rhs=rhs;

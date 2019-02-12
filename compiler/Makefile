@@ -7,13 +7,15 @@ CFLAGS=  -w -fpermissive -std=c++03
 # 	lex lex.l
 # 	yacc -d grammar.y
 # 	$(CC) -g -I$(MYINCLUDES) $(CFLAGS) $(SOURCE) -o $(MYPROGRAM) 
-DEPS = externs.h symtab.h falctypes.h symtabold.h tree.h codegen.h grammar.h
+DEPS = externs.h symtab.h falctypes.h symtabold.h tree.h codegen.h grammar.h extension.h
 
 ODIR=obj
 _OBJ = symtab.o codegen.o tree.o astprint.o y.tab.o lex.yy.o aux.o extension.o
-OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+_OBJ_CPP = worklist.o util.o
+OBJ_C = $(patsubst %,$(ODIR)/%,$(_OBJ))
+OBJ_CPP = $(patsubst %,$(ODIR)/%,$(_OBJ_CPP))
 
-../flcn: $(OBJ)
+../flcn: $(OBJ_CPP) $(OBJ_C)
 	$(CC) -o $@ $^ $(CFLAGS)
 
 lex.yy.c: lex.l
@@ -24,6 +26,10 @@ y.tab.c: grammar.y
 
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -g -c -o $@ $< $(CFLAGS)
+
+$(ODIR)/%.o: %.cpp $(DEPS)
+	$(CC) -g -c -o $@ $< $(CFLAGS)
+
 
 .PHONY: clean
 

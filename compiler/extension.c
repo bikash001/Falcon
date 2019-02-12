@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdlib>
 #include "falctypes.h"
+#include "extension.h"
 using namespace std;
 
 std::vector<statement*> foreach_list;
@@ -14,7 +15,6 @@ extern std::map<char*, statement*> fnamescond;
 extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 extern int CONVERT_VERTEX_EDGE;
-int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
 int stream_count = 0;
 std::map<dir_decl*, statement*> graph_insert_point; //store location to insert gpu graph
 extern tree_expr *temp_stmt_add;
@@ -26,57 +26,14 @@ std::map<dir_decl*, std::pair<statement*, std::map<dir_decl*, statement*>*>*> gr
 std::map<dir_decl*, statement*> fx_sets;
 //stores collection declaration
 std::map<dir_decl*, statement*> fx_collections;
-struct comparator;
 static void walk_find_prop_util(map<dir_decl*, set<char*, comparator> > &rmp, map<dir_decl*, set<char*, comparator> > &wmp, assign_stmt *astmt, dir_decl *dg);
 static void replace_map_variables(map<dir_decl*, set<char*, comparator> > &tab, tree_decl_stmt *params, assign_stmt *args);
 static bool same_level(statement *start, statement *end, statement *goal);
-static char* create_string(char *str);
 static statement* function_end(statement *stmt);
 static dir_decl* find_var(map<dir_decl*, set<char*, comparator> > &mp, char *cc);
 static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab, statement *temp);
 extern int TOT_GPU_GRAPH;
 
-struct comparator
-{
-	bool operator()(char *a, char *b) const{
-		return strcmp(a, b) < 0;
-	}
-};
-
-
-// check if the attribute used is inbuilt
-bool is_lib_attr(LIBDATATYPE type, const char *name)
-{
-	if(type == POINT_TYPE) {
-		// "minEdge","maxEdge","x","y","nbrs","inNbrs","outNbrs","isdel"
-		int len = strlen(name);
-		if(len == 1) {
-			if(name[0]=='x' || name[1]=='y') return true;
-		} else if(len == 4) {
-			return strcmp(name, "nbrs")==0;
-		} else if(len == 5) {
-			return strcmp(name, "isdel")==0;
-		} else if(len == 6) {
-			return strcmp(name, "inNbrs")==0;
-		} else if(len == 7) {
-			if(strcmp("minEdge", name)==0) return true;
-			else if(strcmp("maxEdge", name)==0) return true;
-			else if(strcmp("outNbrs", name)==0) return true;
-		}
-	} else if(type == EDGE_TYPE) {
-		// "src","dst","weight","isdel"
-		int len = strlen(name);
-		if(len==3) {
-			if(strcmp("src", name)==0) return true;
-			else if(strcmp("dst", name)==0) return true;
-		} else if(len == 5) {
-			return strcmp("isdel", name)==0;
-		} else if(len == 6) {
-			return strcmp("weight", name)==0;
-		}
-	}
-	return false;
-}
 
 // Returns the pointer to SBLOCK_STMT of function.
 // Used to insert new statements at the beginning of a function in case of verted-edge conversion.
@@ -784,11 +741,6 @@ static void walk_exp(dir_decl* old_decl, dir_decl* new_decl, tree_expr *expr)
 	}
 }
 
-static dir_decl* parent_graph(dir_decl *dd)
-{
-	while(dd->parent && dd->parent->libdtype != GRAPH_TYPE) dd = dd->parent;
-	return dd->parent;
-}
 
 // Walks through expression to find what attributes are used
 static void walk_find_prop(map<dir_decl*, set<char*, comparator> > &mp, tree_expr *expr, dir_decl *dg)
@@ -824,7 +776,7 @@ static void walk_find_prop(map<dir_decl*, set<char*, comparator> > &mp, tree_exp
 			// printf("TEST-2\n");
 			if(expr->rhs->expr_type == VAR) {
 				// printf("TEST <--> %s\n", expr->rhs->name);
-				dir_decl *temp = parent_graph(expr->lhs->lhs);
+				dir_decl *temp = get_parent_graph(expr->lhs->lhs);
 				if(temp == NULL) {
 					temp = dg;
 				}
@@ -1300,7 +1252,7 @@ static void gencode_properties(map<dir_decl*, set<char*, comparator> > &mp, map<
 	}
 }
 
-// Utility function to walk through statements and call wal_exp() to replace old variables with new
+// Utility function to walk through statements and call walk_exp() to replace old variables with new
 static void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *begin, map<dir_decl*, dir_decl*> &tab)
 {
 	while(begin && begin->sttype != FUNCTION_EBLOCK_STMT){
@@ -1395,14 +1347,6 @@ static void walk_statement(dir_decl* old_decl, dir_decl* new_decl, statement *be
 	}
 }
 
-// Inserts a statement stmt in between lhs and rhs
-static void insert_statement(statement *lhs, statement *stmt, statement *rhs)
-{
-	lhs->next = stmt;
-	stmt->prev = lhs;
-	stmt->next = rhs;
-	rhs->prev = stmt;
-}
 
 // Creates a declaration statement.
 static statement* create_decl_statement(LIBDATATYPE type)
@@ -1896,11 +1840,6 @@ static void print(map<dir_decl*, set<char*, comparator> > &tab, dir_decl* ss)
 	cout << "**************************" << endl;
 }
 
-static char* create_string(char *str) {
-	char* temp = malloc(sizeof(char)*(1+strlen(str)));
-	strcpy(temp, str);
-	return temp;
-}
 
 static statement* create_empty_stmt(int lineno) {
 	statement *stmt = new statement;

@@ -5,6 +5,7 @@
 #include <typeinfo>
 #include <vector>
 #include "symtabold.h"
+#include "extension.h"
 int GPUCODEFLAG=0;
 int ERRPRINT;
 extern int morph_size,TOT_GPU_GRAPH,MORPH_FLAG;//yes
@@ -1814,11 +1815,12 @@ selection_statement
       t4->end_stmt = temp3;
 	  }
   | IF '(' expression ')' statement %prec THEN{
-  		statement *t4=createstmt(IF_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
+      statement *end = temp3;
+      statement *t4=createstmt(IF_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
   		statement *t2=(statement *)$5;
       //fprintf(FP1,"//else sttype %d ",t2->sttype);
       createifstmt(&t4,NULL,&t2,&temp3,0);
-      t4->end_stmt = temp3;
+      t4->end_stmt = end;;
   	}
   | SWITCH '(' expression ')' statement{
   		statement *t4=createstmt(SWITCH_STMT,((assign_stmt *)($3))->rhs,NULL,LINENO);
@@ -2397,6 +2399,7 @@ int main(int argc, char *argv[]){
   strncpy(gheader,argv[1],t1);
   strncpy(source,argv[1],t1+1);
   bool cpuParallelSection = false;
+  bool WORKLIST = false;
   if(argc >2 ){
     //for all extra command line argument. option for partition size on cpu gpu has to be added.
     int temp=2;
@@ -2413,6 +2416,8 @@ int main(int argc, char *argv[]){
         isGPU = atoi(argv[temp+1]);
       } else if(!strcmp(argv[temp], "-async")) {// asynchronous execution
         cpuParallelSection = atoi(argv[temp+1]);
+      } else if(!strcmp(argv[temp], "-worklist")) {
+        WORKLIST = true;
       }
       temp=temp+2;
     }
@@ -2496,6 +2501,9 @@ int main(int argc, char *argv[]){
     // falcon extension code
     fprintf(stderr, "%s\n", "Converting vertex to edge based.");
     convert_vertex_edge();
+  } else if(WORKLIST) {
+    fprintf(stderr, "%s\n", "Generating Worklist based code");
+    process(fnames);
   }
 
   if(!isGPU && (cpuParallelSection || !sections_stmts.empty())) {
