@@ -148,13 +148,6 @@ tree_typedecl *createcompounddef (enum DATATYPE x,char *name) {
 
 }
 
-tree_decl_stmt *createdeclstmt(class tree_typedecl *lhs,class tree_id *rhs,class dir_decl *dirrhs) {
-    tree_decl_stmt *ptr=new tree_decl_stmt();
-    ptr->rhs=rhs;
-    ptr->lhs=lhs;
-    ptr->dirrhs=dirrhs;
-    return ptr;
-}
 dir_decl *createdirdecl(char *name,bool gpu,tree_expr *assign,int ptrcnt,bool sbrack_flag,int brack_flag,bool stat,dir_decl *typelist) {
     dir_decl *ptr=new dir_decl();
     if(name!=NULL) {

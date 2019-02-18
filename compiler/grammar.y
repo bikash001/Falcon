@@ -2503,7 +2503,7 @@ int main(int argc, char *argv[]){
     convert_vertex_edge();
   } else if(WORKLIST) {
     fprintf(stderr, "%s\n", "Generating Worklist based code");
-    process(fnames);
+    temp = process(fnames, temp);
   }
 
   if(!isGPU && (cpuParallelSection || !sections_stmts.empty())) {

@@ -538,6 +538,21 @@ public:
     void codeGen1();
 
     statement();
+    ~statement() {
+        if(expr1 != NULL) delete expr1;
+        if(expr2 != NULL) delete expr2;
+        if(expr3 != NULL) delete expr3;
+        if(expr4 != NULL) delete expr4;
+        if(expr5 != NULL) delete expr5;
+        if(f1 != NULL) delete f1;
+        if(f2 != NULL) delete f2;
+        if(f3 != NULL) delete f3;
+        if(stdecl != NULL) delete stdecl;
+        if(stassign != NULL) delete stassign;
+        if(stiter != NULL) delete stiter;
+        if(flist != NULL) delete flist;
+        if(name != NULL) delete name;
+    }
 };
 class iter_stmt {
 public:

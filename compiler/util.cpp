@@ -57,6 +57,13 @@ assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs
 }
 
 
+tree_decl_stmt *createdeclstmt(class tree_typedecl *lhs,class tree_id *rhs,class dir_decl *dirrhs) {
+    tree_decl_stmt *ptr=new tree_decl_stmt();
+    ptr->rhs=rhs;
+    ptr->lhs=lhs;
+    ptr->dirrhs=dirrhs;
+    return ptr;
+}
 
 // check if the attribute used is inbuilt
 bool is_lib_attr(LIBDATATYPE type, const char *name)

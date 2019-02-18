@@ -12,8 +12,8 @@ std::vector<statement*> sections_stmts;
 extern char* libdtypenames[10];
 extern std::map<char*, statement*> fnames;
 extern std::map<char*, statement*> fnamescond;
-extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
-extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
+// extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
+// extern assign_stmt *createassignlhsrhs(enum ASSIGN_TYPE x,tree_expr *lhs,tree_expr *rhs);
 extern int CONVERT_VERTEX_EDGE;
 int stream_count = 0;
 std::map<dir_decl*, statement*> graph_insert_point; //store location to insert gpu graph

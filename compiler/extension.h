@@ -15,7 +15,7 @@ struct comparator
 	}
 };
 
-void process(std::map<char*, statement*> &fnames);
+statement* process(std::map<char*, statement*> &fnames, statement *head);
 bool is_lib_attr(LIBDATATYPE type, const char *name);
 
 inline dir_decl* get_parent_graph(dir_decl *dd)
@@ -36,5 +36,5 @@ statement *createstmt(STMT_TYPE sttype,tree_expr *expr,char *name,int lineno);
 tree_expr *funcallpostfix(tree_expr *t1,enum EXPR_TYPE type,int kernel, tree_expr  *arglist);
 tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etype,int ntype);
 void insert_statement(statement *lhs, statement *stmt, statement *rhs);
-
+tree_decl_stmt *createdeclstmt(class tree_typedecl *lhs,class tree_id *rhs,class dir_decl *dirrhs);
 #endif
