@@ -1,4 +1,4 @@
-#include "extension.h"
+#include "util.h"
 
 int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
 
@@ -97,4 +97,39 @@ bool is_lib_attr(LIBDATATYPE type, const char *name)
 		}
 	}
 	return false;
+}
+
+FunctionInfo::FunctionInfo() {
+    fnc = NULL;
+}
+
+FunctionInfo::FunctionInfo(const statement *stmt) {
+    fnc = stmt;
+}
+
+statement* FunctionInfo::get_function() const {
+    return fnc;
+}
+string FunctionInfo::get_function_name() const {
+    if(fnc != NULL) {
+        return string(fnc->stdecl->dirrhs->name);
+    } else {
+        return string();
+    }
+}
+void FunctionInfo::insert_var(const dir_decl* d) const {
+    if(is_local_var(d)) {
+        insert_local_var(d);
+    } else {
+        insert_global_var(d);
+    }
+}
+void FunctionInfo::insert_global_var(dir_decl* d) {
+    global_vars.insert(d);
+}
+void FunctionInfo::insert_local_var(dir_decl* d) {
+    local_vars.insert(d);
+}
+bool FunctionInfo::is_local_var(const dir_decl* d) const {
+    return local_vars.find(d) != local_vars.end();
 }

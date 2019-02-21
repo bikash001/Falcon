@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <vector>
 #include <set>
-#include "extension.h"
+#include "util.h"
 using namespace std;
 
 // Returns the statement which defines a function.
@@ -31,6 +31,102 @@ static bool check(const statement *fnc) {
 	}
 	return false;
 }
+
+/*
+static bool check_util(FunctionInfo &fi, statement *begin, statement *end, set<statement*> &visited)
+{
+	while(begin && (begin != end)) {
+		if(visited.find(begin) != visited.end()) {
+			return;
+		} else {
+			visited.insert(begin);
+		}
+		if(begin->sttype == DECL_STMT) {
+			dir_decl *expr = begin->stdecl->dirrhs;
+			while(expr) {
+				if(expr->rhs) { // only check rhs, since lhs is being defined (i.e. local variable)
+					check_prop(fi, expr->rhs, dg);
+				}
+				expr = expr->nextv;
+			}
+		} else if(begin->sttype == FOR_STMT) {
+			if(begin->f1) check_prop_util(fi, begin->f1->stassign, dg);
+			if(begin->f2) check_prop_util(fi, begin->f2->stassign, dg);
+			if(begin->f3) check_prop_util(fi, begin->f3->stassign, dg);
+		} else if(begin->sttype == ASSIGN_STMT) {
+			check_prop_util(fi, begin->stassign, dg);
+		} else if(begin->sttype != FOREACH_STMT) {
+			// if(begin->expr1) {
+			// 	walk_find_prop(rmp, begin->expr1, dg);
+			// }
+			// if(begin->expr2) {
+			// 	walk_find_prop(rmp, begin->expr2, dg);
+			// }
+			// if(begin->expr3) {
+			// 	walk_find_prop(rmp, begin->expr3, dg);
+			// }
+			// if(begin->expr4) {
+			// 	walk_find_prop(rmp, begin->expr4, dg);
+			// }
+			// if(begin->expr5) {
+			// 	walk_find_prop(rmp, begin->expr5, dg);
+			// }				
+			if(begin->f1) {
+				find_update_point(v, begin->f1, end, visited, dg, values);
+			}
+			if(begin->f2) {
+				find_update_point(v, begin->f2, end, visited, dg, values);
+			}
+			if(begin->f3) {
+				find_update_point(v, begin->f3, end, visited, dg, values);
+			}
+		} else {
+			// if(begin->expr4) {	// condition of foreach
+			// 	walk_find_prop(rmp, begin->expr4, dg);
+			// }
+			if(begin->stassign) { // function call
+				assign_stmt *astmt = begin->stassign;
+				if(astmt->lhs && astmt->asstype == AASSIGN) {
+					walk_find_prop(v, astmt->lhs, dg, values);
+				}
+				// if(astmt->rhs) {
+				// 	assign_stmt *arglist = begin->stassign->rhs->arglist;
+				// 	walk_find_prop_util(rmp, wmp, arglist, dg);
+
+				// 	if(astmt->rhs->expr_type == FUNCALL) {
+				// 		// printf("TEST-590 %s\n", astmt->rhs->name);
+
+				// 		statement *target = get_function(astmt->rhs->name);
+				// 		if(target == NULL) { // may be library function
+				// 			fprintf(stderr, "Error-1062: function %s not defined.\n", astmt->rhs->name);
+				// 			walk_find_prop(wmp, astmt->rhs, dg);
+				// 			// exit(0);
+				// 		} else {
+				// 			tree_decl_stmt *params = target->stdecl->dirrhs->params;
+							
+				// 			dir_decl *gp = NULL;
+				// 			while(params) {
+				// 				if(gp==NULL && params->dirrhs->libdtype == GRAPH_TYPE) {
+				// 					gp = params->dirrhs;
+				// 				}
+				// 				params = params->next;
+				// 			}
+
+				// 			find_update_point(rmp, wmp, target->next->next, target->end_stmt, gp, visited);
+				// 			replace_map_variables(rmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+				// 			replace_map_variables(wmp, target->stdecl->dirrhs->params, astmt->rhs->arglist);
+				// 		}
+				// 	} else {
+				// 		walk_find_prop(rmp, astmt->rhs, dg);
+				// 	}
+				// }
+			}
+		}
+		
+		begin = begin->next;
+	}
+}
+*/
 
 // Walks through expression to find what attributes are used
 static bool walk_find_prop(set<char*, comparator> &v, tree_expr *expr, dir_decl *dg=NULL, set<dir_decl*> *values=NULL)
@@ -449,7 +545,7 @@ static pair<dir_decl*,int> change_func(statement *stmt, dir_decl **graph) {
 			tx->name = create_string(wklist->name);
 			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 			tx->rhs = new tree_expr();
-			tx->rhs->name = create_string("push");
+			tx->rhs->name = create_string("add");
 			tx->rhs->expr_type = VAR;
 			tx->kernel = 0;
 
@@ -795,7 +891,7 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 	tx->name = create_string(wklist->name);
 	tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 	tx->rhs = new tree_expr();
-	tx->rhs->name = create_string("push");
+	tx->rhs->name = create_string("add");
 	tx->rhs->expr_type = VAR;
 	tx->kernel = 0;
 

@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstdlib>
 #include "falctypes.h"
-#include "extension.h"
+#include "util.h"
 using namespace std;
 
 std::vector<statement*> foreach_list;

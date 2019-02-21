@@ -5,7 +5,7 @@
 #include <typeinfo>
 #include <vector>
 #include "symtabold.h"
-#include "extension.h"
+#include "util.h"
 int GPUCODEFLAG=0;
 int ERRPRINT;
 extern int morph_size,TOT_GPU_GRAPH,MORPH_FLAG;//yes
