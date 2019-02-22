@@ -25,20 +25,19 @@ private:
 		return cudaMalloc((void**)&out, sizeof(int)*sz) == cudaSuccess;
 	}
 
-	__host__ void initialize(int size) {
-		// launch kernel
-		cudaDeviceSynchronize();
-		inSize = size;
+	__host__ void initialize(int i) {
+		cudaMemcpyToSymbol(in, &i, sizeof(int), 0, cudaMemcpyHostToDevice);
+		inSize = 1;
 		outSize = 0;
 	}
 
 public:
-	__host__ Worklist(int npoints, int nedges) {
+	__host__ Worklist(int npoints, int nedges, int start=0) {
 		if(!allocate(nedges)) {
 			fprintf(stderr, "ERROR: %s\n", "Memory allocation error @Worklist");
 		}
-		initialize(npoints);
-		insize = npoints
+		initialize(start);
+		inSize = 1;
 	}
 
 	__device__ void push(int val) {
@@ -55,13 +54,20 @@ public:
 		return in[i];
 	}
 
+	__host__ __device__ bool empty() {
+		return inSize == 0;
+	}
+
 	__host__ void swap() {
-		// launch compute kernel
 		inSize = outSize;
 		outSize = 0;
 		int *temp = in;
 		in = out;
 		out = temp;
+	}
+
+	__host__ __device__ int size() {
+		return inSize;
 	}
 
 	~Worklist() {
