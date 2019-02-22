@@ -1,5 +1,6 @@
 bin
 */generated/*/*.*
+!*/generated/include/*
 tmp
 compiler/original/
 compiler/obj/*
