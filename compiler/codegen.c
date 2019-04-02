@@ -488,8 +488,11 @@ void statement::codeGen(FILE *FP1) {
         else {
             int ff;
             if(Gkernel==0) {
-                int val=check_gpu_expr(this->expr1->lhs);
-                val=val+check_gpu_expr(this->expr1->rhs);
+                int val=0;
+                if(this->expr1->expr_type != VAR) {
+                    val = check_gpu_expr(this->expr1->lhs);
+                    val=val+check_gpu_expr(this->expr1->rhs);
+                }
                 if(val>=1 && Gkernel==0) {
                     if(val!=5) {
                         print_gpu_if_stmt(this,val);

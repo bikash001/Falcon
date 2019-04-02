@@ -4,12 +4,13 @@ int falc_ext = 0;	// variable names used by falcon extension "_flcn{falc_ext}"
 
 
 // Inserts a statement stmt in between lhs and rhs
-void insert_statement(statement *lhs, statement *stmt, statement *rhs)
+statement* insert_statement(statement *lhs, statement *stmt, statement *rhs)
 {
 	lhs->next = stmt;
 	stmt->prev = lhs;
 	stmt->next = rhs;
 	rhs->prev = stmt;
+    return stmt;
 }
 
 
@@ -125,11 +126,73 @@ void FunctionInfo::insert_var(const dir_decl* d) const {
     }
 }
 void FunctionInfo::insert_global_var(dir_decl* d) {
-    global_vars.insert(d);
+    global_read.insert(d);
 }
 void FunctionInfo::insert_local_var(dir_decl* d) {
     local_vars.insert(d);
 }
 bool FunctionInfo::is_local_var(const dir_decl* d) const {
     return local_vars.find(d) != local_vars.end();
+}
+void FunctionInfo::insert_attr_read(char* c) {
+    attr_read.insert(c);
+}
+void FunctionInfo::insert_attr_write(char* c) {
+    attr_write.insert(c);
+}
+void FunctionInfo::insert_var_read(dir_decl* d){
+    if(!is_local_var(d)) {
+        global_read.insert(d);
+    }
+}
+void FunctionInfo::insert_var_write(dir_decl* d){
+    if(!is_local_var(d)) {
+        global_write.insert(d);
+    }
+}
+void FunctionInfo::stats() const {
+    fprintf(stderr, "%d %d %d %d %d\n", local_vars.size(), global_read.size(), global_write.size(), attr_read.size(), attr_write.size());
+}
+void FunctionInfo::swap_local(FunctionInfo &f) {
+    local_vars.swap(f.local_vars);
+}
+void FunctionInfo::copy_local(FunctionInfo &f) {
+    local_vars.insert(f.local_vars.begin(), f.local_vars.end());
+}
+void FunctionInfo::copy_all(FunctionInfo &f) {
+    global_read.insert(f.global_read.begin(), f.global_read.end());
+    global_write.insert(f.global_write.begin(), f.global_write.end());
+    attr_read.insert(f.attr_read.begin(), f.attr_read.end());
+    attr_write.insert(f.attr_write.begin(), f.attr_write.end());
+}
+bool FunctionInfo::rw_attr_dep(const FunctionInfo &f) const {
+    for(set<char*, comparator>::iterator ii=attr_read.begin(); ii!=attr_read.end(); ++ii) {
+        if(f.attr_write.find(*ii) != f.attr_write.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+bool FunctionInfo::empty() const {
+    if(!local_vars.empty()) return false;
+    if(!global_read.empty() || !global_write.empty()) return false;
+    if(!attr_read.empty() || !attr_write.empty()) return false;
+    return true;
+}
+bool FunctionInfo::attr_write_empty() const {
+    return attr_write.empty();
+}
+set<char*, comparator> FunctionInfo::get_read_attr() {
+    return attr_read;
+}
+// void FunctionInfo::intersection(FunctionInfo &f, vector<)
+
+void ValuePair::insert(statement *stmt, set<dir_decl*> &v) {
+    data.push_back(make_pair(stmt, v));
+}
+int ValuePair::size() const {
+    return data.size();
+}
+pair<statement*, set<dir_decl*> > ValuePair::get(int i) const {
+    return data[i];
 }

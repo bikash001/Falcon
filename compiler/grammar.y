@@ -731,10 +731,12 @@ declaration_specifiers
 
 init_declarator_list
 	: init_declarator {$$=$1;}
-	| init_declarator_list ',' init_declarator{
-  		dir_decl *t1=$1; while(t1->nextv!=NULL)t1=t1->nextv;
+	| init_declarator_list ',' init_declarator {
+  		dir_decl *t1=$1;
+      while(t1->nextv!=NULL)t1=t1->nextv;
   		t1->nextv=$3;
-  		$$=$1;} 
+  		$$=$1;
+    } 
 	;
 
 init_declarator
@@ -2026,8 +2028,10 @@ iteration_statement
         temp3->expr4=temp1->expr4;
         temp3->stassign=temp1->stassign;
         fnamescond[temp1->stassign->rhs->name]=temp3;
-        temp3->prev->next=temp3;temp1=temp3;
+        temp3->prev->next=temp3;
+        temp1=temp3;
         temp3->end_stmt = temp3;
+        
         if(level_of_foreach == 1 && temp->sttype == ASSIGN_STMT && temp->stassign->rhs->expr_type == FUNCALL) foreach_list.push_back(temp3);
       }
     	currsymtab=currsymtab->parent;
@@ -2502,8 +2506,11 @@ int main(int argc, char *argv[]){
     fprintf(stderr, "%s\n", "Converting vertex to edge based.");
     convert_vertex_edge();
   } else if(WORKLIST) {
-    fprintf(stderr, "%s\n", "Generating Worklist based code");
-    temp = process(fnames, temp);
+    statement *stmt = process(fnames, temp);
+    if(stmt != NULL) {
+      temp = stmt;
+      fprintf(stderr, "%s\n", "Generating Worklist based code");
+    }
   }
 
   if(!isGPU && (cpuParallelSection || !sections_stmts.empty())) {

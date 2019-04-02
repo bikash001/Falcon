@@ -93,7 +93,7 @@ void mstunion(Point  p,Graph graph,Set set[Point(graph)])
 	}
 }
 
-initmark(Edge  e, Graph graph)
+void initmark(Edge  e, Graph graph)
 {
 	e.mark=0;
 }
@@ -135,4 +135,5 @@ int main(int argc,char *argv[])
 		if(graph.edges[i].mark)mst=mst+graph.edges[i].mark;
 	}
 	printf("mst cost=%lu\n",mst);
+	return 0;
 }

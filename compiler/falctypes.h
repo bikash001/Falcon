@@ -518,7 +518,7 @@ public:
     int barrier;
     int itr,ker;
     int foreachflag;
-    int lineno,stmtno;//line no high level code and stament no
+    int lineno,stmtno;//line no high level code and statement no
     class tree_expr *expr1,*expr2,*expr3,*expr4,*expr5;//used in statement like for,if etc
     class statement *f1,*f2,*f3;//used in statements like if,for ,if-then-else
     class statement *body;/**NOT USES?? **/
