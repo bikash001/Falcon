@@ -2032,7 +2032,7 @@ iteration_statement
         temp1=temp3;
         temp3->end_stmt = temp3;
         
-        if(level_of_foreach == 1 && temp->sttype == ASSIGN_STMT && temp->stassign->rhs->expr_type == FUNCALL) foreach_list.push_back(temp3);
+        if(level_of_foreach == 1 && temp3->stassign && temp3->stassign->rhs->expr_type == FUNCALL) foreach_list.push_back(temp3);
       }
     	currsymtab=currsymtab->parent;
       KERNEL=0;
@@ -2073,7 +2073,7 @@ iteration_statement
 			  temp3->prev->next=temp3;
 			  temp1=temp3;
         temp3->end_stmt = temp3;
-        if(level_of_foreach == 1 && temp->sttype == ASSIGN_STMT && temp->stassign->rhs->expr_type == FUNCALL) foreach_list.push_back(temp3);
+        if(level_of_foreach == 1 && temp3->stassign && temp3->stassign->rhs->expr_type == FUNCALL) foreach_list.push_back(temp3);
 	    }
 	    currsymtab=currsymtab->parent;
 	    KERNEL=0;

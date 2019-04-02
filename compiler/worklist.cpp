@@ -792,7 +792,6 @@ static bool check_func(const statement *fnc, const statement *main, dir_decl **g
 		} else {
 			mod_minf(vp[i].first, vp[i].second, wklist, nd_count);
 		}
-		break;
 	}
 
 	return true;
