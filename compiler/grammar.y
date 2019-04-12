@@ -2421,7 +2421,7 @@ int main(int argc, char *argv[]){
       } else if(!strcmp(argv[temp], "-async")) {// asynchronous execution
         cpuParallelSection = atoi(argv[temp+1]);
       } else if(!strcmp(argv[temp], "-worklist")) {
-        WORKLIST = true;
+        WORKLIST = atoi(argv[temp+1]);
       }
       temp=temp+2;
     }

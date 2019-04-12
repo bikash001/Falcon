@@ -355,6 +355,11 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
             if(extra_array[0]!='\0') {
                 for(int i=0; i<200; i++)extra_array[i]='\0';
             }
+            dir_decl *_ext_parent = NULL;
+            if(expr->lhs->lhs && expr->lhs->lhs->libdtype == COLLECTION_TYPE) {
+                _ext_parent = expr->lhs->lhs->parent;
+                expr->lhs->lhs->parent = NULL;
+            }
             if(((dir_decl *)expr->lhs)->libdtype>=0) {
                 if(((dir_decl *)expr->lhs)->libdtype==8)((dir_decl *)expr->lhs)->libdtype==2;//Whats is this?? iterator to point
                 if(expr->lhs->libdtype==COLLECTION_TYPE && expr->lhs->lhs!=NULL && expr->lhs->lhs->gpu==true && (Gkernel==0 || Gkernel>3)) {
@@ -780,6 +785,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     }
                 }
             }
+
             dir_decl *d1= (dir_decl *)(expr->lhs->lhs);
             if(d1 && d1->parent!=NULL) {
                 expr->parent=d1->parent;   //FEB14
@@ -1000,6 +1006,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     }
                 }
             }
+
             if(flag==1 /*&& ariflag==1*/) { //now make function for field acess
 
                 if(expr->lhs->lhs->libdtype==GRAPH_TYPE) {
@@ -1155,6 +1162,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                         d1->ppts=ex;
                     }
                 }
+
                 if(EXTRAFLAG==1) {
                     char temp[50];
                     if(d1->gpu==1) {
@@ -1183,6 +1191,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                     errflag=1;
                 }
             }
+
             if(expr->libdtype!=-1 &&expr->libdtype!=-2  && d1->libstable==NULL) {
 
                 char *name=expr->rhs->name;
@@ -1321,6 +1330,9 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
             }
             sref=sref-1;
             GPSREF=0;
+            if(expr->lhs->lhs && expr->lhs->lhs->libdtype == COLLECTION_TYPE) {
+                expr->lhs->lhs->parent = _ext_parent;
+            }
             return;
         }
         if(strstr(print_string,"extra")!=NULL && expr->lhs->expr_type!=STRUCTREF) {

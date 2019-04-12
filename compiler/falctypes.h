@@ -75,7 +75,8 @@ enum LIBDATATYPE {
     E_P_TYPE,//6
     P_P_TYPE,//7
     ITERATOR_TYPE,//8
-    LINT_TYPE//9
+    LINT_TYPE,//9
+    WORKLIST
 };
 #define TYPESIZE 16
 enum DATATYPE {//stores datatype of variable / constant

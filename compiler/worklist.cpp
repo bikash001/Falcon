@@ -8,6 +8,7 @@
 #include "util.h"
 using namespace std;
 
+set<statement*> mod_functions;
 static void get_variables_info(FunctionInfo&, statement*, statement*, set<statement*>&);
 static void util_info(FunctionInfo&, tree_expr*, int);
 static statement* check_driver(FunctionInfo&, FunctionInfo&, statement*, char*);
@@ -311,14 +312,19 @@ static pair<dir_decl*,int> setup_func(statement *func, dir_decl **graph)
 	// create worklist
 	tree_decl_stmt *ptr = new tree_decl_stmt();
 	p = new tree_typedecl();
-	p->libdatatype = COLLECTION_TYPE;
-	p->name = create_string("collection");
+	if(isGPU) {
+		p->libdatatype = WORKLIST;
+		p->name = create_string("Worklist*");
+	} else {
+		p->libdatatype = COLLECTION_TYPE;
+		p->name = create_string("collection");
+	}
 	ptr->lhs = p;
 
 	dir_decl *d = new dir_decl();
 	snprintf(temp, 30, "_flcn%d", falc_ext++);
 	d->name = create_string(temp);
-	d->libdtype = COLLECTION_TYPE;
+	d->libdtype = p->libdatatype;
 	dir_decl *wklist = d;
 
 	p = new tree_typedecl();
@@ -335,48 +341,55 @@ static pair<dir_decl*,int> setup_func(statement *func, dir_decl **graph)
 	// insert worklist to parameter list
 	params->next = ptr;
 
-	// create a point
-	p = new tree_typedecl();
-	p->libdatatype = POINT_TYPE;
-	p->name = create_string("point ");
-	p->d1 = *graph;
-	if(*graph != NULL) p->ppts = (*graph)->ppts;
+	if(isGPU) {
+		params = func->stdecl->dirrhs->params;
+		func->stdecl->dirrhs->params = params->next;
 
-	tree_decl_stmt *tstmt = new tree_decl_stmt();
-	tstmt->lhs = p;
-	tstmt->dirrhs = pt;
-	statement *st = new statement();
-	st->sttype = DECL_STMT;
-	st->stdecl = tstmt;
+	} else {
+		// create a point
+		p = new tree_typedecl();
+		p->libdatatype = POINT_TYPE;
+		p->name = create_string("point ");
+		p->d1 = *graph;
+		if(*graph != NULL) p->ppts = (*graph)->ppts;
 
-	insert_statement(func->next, st, func->next->next);
+		tree_decl_stmt *tstmt = new tree_decl_stmt();
+		tstmt->lhs = p;
+		tstmt->dirrhs = pt;
+		statement *st = new statement();
+		st->sttype = DECL_STMT;
+		st->stdecl = tstmt;
 
-	// initialize point
-	tree_expr *tx = new tree_expr(pt);
-	tx->name = create_string(pt->name);
-	tx->nodetype = -1;
+		insert_statement(func->next, st, func->next->next);
 
-	// assignment operator
-	assign_stmt *as = new assign_stmt();
-	as->asstype = AASSIGN;
-	as->lhs = tx;
-	tx->kernel = 5;
-	tx = new tree_expr(node);
-	tx->name = create_string(node->name);
-	tx->nodetype = -1;
-	tree_expr *ex = binaryopnode(tx, NULL, STRUCTREF, -1);
-	ex->rhs = new tree_expr();
-	ex->rhs->name = create_string("p");
-	ex->rhs->expr_type = VAR;
-	ex->kernel = 5;
-	tx->nodetype = -10;
-	as->rhs = ex;
+		// initialize point
+		tree_expr *tx = new tree_expr(pt);
+		tx->name = create_string(pt->name);
+		tx->nodetype = -1;
 
-	statement *stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-	stmt1->stmtno = 0;
-	stmt1->stassign = as;
+		// assignment operator
+		assign_stmt *as = new assign_stmt();
+		as->asstype = AASSIGN;
+		as->lhs = tx;
+		tx->kernel = 5;
+		tx = new tree_expr(node);
+		tx->name = create_string(node->name);
+		tx->nodetype = -1;
+		tree_expr *ex = binaryopnode(tx, NULL, STRUCTREF, -1);
+		ex->rhs = new tree_expr();
+		ex->rhs->name = create_string("p");
+		ex->rhs->expr_type = VAR;
+		ex->kernel = 5;
+		tx->nodetype = -10;
+		as->rhs = ex;
 
-	insert_statement(st, stmt1, st->next);
+		statement *stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+		stmt1->stmtno = 0;
+		stmt1->stassign = as;
+
+		insert_statement(st, stmt1, st->next);
+	}
+	mod_functions.insert(func);
 	return make_pair(wklist,nd_count);
 }
 
@@ -400,68 +413,41 @@ static int mod_if(statement *ifstmt, set<char*, comparator> &props, dir_decl *wk
 		for(set<dir_decl*>::iterator ii=values.begin(); ii!=values.end(); ++ii) {
 			int tcnt = falc_ext++;
 			
-			// type specifier
-			tree_typedecl *td = new tree_typedecl();
-			td->datatype = STRUCT_TYPE;
-			td->compoundtype = 1;
-			snprintf(temp, 30, "struct _flcn%d", nd_count);
-			td->name = create_string(temp);
-			td->def = 0;
-			snprintf(temp, 30, "_flcn%d", nd_count);
-			td->vname = create_string(temp);
-			
-			dir_decl *d= new dir_decl();
-			snprintf(temp, 30, "_flcn%d", tcnt);
-			d->name = create_string(temp);
+			tree_expr *tx;
+			dir_decl *d;
+			statement *stmt1;
+			if(!isGPU) {
+				// type specifier
+				tree_typedecl *td = new tree_typedecl();
+				td->datatype = STRUCT_TYPE;
+				td->compoundtype = 1;
+				snprintf(temp, 30, "struct _flcn%d", nd_count);
+				td->name = create_string(temp);
+				td->def = 0;
+				snprintf(temp, 30, "_flcn%d", nd_count);
+				td->vname = create_string(temp);
+				
+				d= new dir_decl();
+				snprintf(temp, 30, "_flcn%d", tcnt);
+				d->name = create_string(temp);
 
-			tree_decl_stmt *tstmt = new tree_decl_stmt();
-			tstmt->lhs = td;
-			tstmt->dirrhs = d;
-			statement *st = new statement();
-			st->sttype = DECL_STMT;
-			st->stdecl = tstmt;
+				tree_decl_stmt *tstmt = new tree_decl_stmt();
+				tstmt->lhs = td;
+				tstmt->dirrhs = d;
+				statement *st = new statement();
+				st->sttype = DECL_STMT;
+				st->stdecl = tstmt;
 
-			insert_statement(ifstmt->end_stmt->prev, st, ifstmt->end_stmt);
+				insert_statement(ifstmt->end_stmt->prev, st, ifstmt->end_stmt);
 
-			// assign point to node
-			// lhs of assignment
-			tree_expr *tx = new tree_expr(d);
-			tx->name = create_string(d->name);
-			tx->nodetype = -1;
-			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-			tx->rhs = new tree_expr();
-			tx->rhs->name = create_string("p");
-			tx->rhs->expr_type = VAR;
-			tx->kernel = 5;
-			
-			// assignment operator
-			assign_stmt *as = new assign_stmt();
-			as->asstype = AASSIGN;
-			as->lhs = tx;
-			
-			// rhs of assignment
-			tx = new tree_expr(*ii);
-			tx->name = create_string((*ii)->name);
-			tx->nodetype = -1;
-			tx->kernel = 5;
-			as->rhs = tx;
-			as->semi = 1;
-
-			statement *stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-			stmt1->stmtno = 0;
-			stmt1->stassign = as;
-
-			insert_statement(ifstmt->end_stmt->prev, stmt1, ifstmt->end_stmt);
-
-			// assign props to node
-			for(set<char*, comparator>::iterator jj=props.begin(); jj!=props.end(); jj++) {
+				// assign point to node
 				// lhs of assignment
 				tx = new tree_expr(d);
 				tx->name = create_string(d->name);
 				tx->nodetype = -1;
 				tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 				tx->rhs = new tree_expr();
-				tx->rhs->name = create_string(*jj);
+				tx->rhs->name = create_string("p");
 				tx->rhs->expr_type = VAR;
 				tx->kernel = 5;
 				
@@ -474,35 +460,72 @@ static int mod_if(statement *ifstmt, set<char*, comparator> &props, dir_decl *wk
 				tx = new tree_expr(*ii);
 				tx->name = create_string((*ii)->name);
 				tx->nodetype = -1;
-				tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-				tx->rhs = new tree_expr();
-				tx->rhs->name = create_string(*jj);
-				tx->rhs->expr_type = VAR;
 				tx->kernel = 5;
 				as->rhs = tx;
+				as->semi = 1;
 
 				stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
 				stmt1->stmtno = 0;
 				stmt1->stassign = as;
 
 				insert_statement(ifstmt->end_stmt->prev, stmt1, ifstmt->end_stmt);
-			}
 
+				// assign props to node
+				for(set<char*, comparator>::iterator jj=props.begin(); jj!=props.end(); jj++) {
+					// lhs of assignment
+					tx = new tree_expr(d);
+					tx->name = create_string(d->name);
+					tx->nodetype = -1;
+					tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+					tx->rhs = new tree_expr();
+					tx->rhs->name = create_string(*jj);
+					tx->rhs->expr_type = VAR;
+					tx->kernel = 5;
+					
+					// assignment operator
+					assign_stmt *as = new assign_stmt();
+					as->asstype = AASSIGN;
+					as->lhs = tx;
+					
+					// rhs of assignment
+					tx = new tree_expr(*ii);
+					tx->name = create_string((*ii)->name);
+					tx->nodetype = -1;
+					tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+					tx->rhs = new tree_expr();
+					tx->rhs->name = create_string(*jj);
+					tx->rhs->expr_type = VAR;
+					tx->kernel = 5;
+					as->rhs = tx;
+
+					stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+					stmt1->stmtno = 0;
+					stmt1->stassign = as;
+
+					insert_statement(ifstmt->end_stmt->prev, stmt1, ifstmt->end_stmt);
+				}
+			}
 			// insert node to worklist
 			tx = new tree_expr(wklist);
 			tx->nodetype = -10;
 			tx->name = create_string(wklist->name);
 			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 			tx->rhs = new tree_expr();
-			tx->rhs->name = create_string("add");
+			tx->rhs->name = create_string("push");
 			tx->rhs->expr_type = VAR;
 			tx->kernel = 0;
 
 			// argument
-			tree_expr *ex = new tree_expr(d);
-			ex->nodetype = -1;
-			ex->name = create_string(d->name);
-
+			tree_expr *ex;
+			if(isGPU) {
+				ex = new tree_expr(*ii);
+				ex->nodetype = -1;
+				ex->name = create_string((*ii)->name);
+			} else {
+				ex = new tree_expr(d);
+				ex->nodetype = -1;
+				ex->name = create_string(d->name);
+			}
 			tx->rhs = funcallpostfix(tx->rhs, FUNCALL, 0, ex);
 
 			stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
@@ -586,69 +609,42 @@ static int mod_minf(statement *cstmt, set<char*,comparator> &props, dir_decl *wk
 		for(set<dir_decl*>::iterator ii=values.begin(); ii!=values.end(); ++ii) {
 			int tcnt = falc_ext++;
 			
-			// type specifier
-			tree_typedecl *td = new tree_typedecl();
-			td->datatype = STRUCT_TYPE;
-			td->compoundtype = 1;
-			snprintf(temp, 30, "struct _flcn%d", nd_count);
-			td->name = create_string(temp);
-			td->def = 0;
-			snprintf(temp, 30, "_flcn%d", nd_count);
-			td->vname = create_string(temp);
-			
-			dir_decl *d= new dir_decl();
-			snprintf(temp, 30, "_flcn%d", tcnt);
-			d->name = create_string(temp);
+			statement *stmt1;
+			dir_decl *d;
+			tree_expr *tx;
+			if(!isGPU) {
+				// type specifier
+				tree_typedecl *td = new tree_typedecl();
+				td->datatype = STRUCT_TYPE;
+				td->compoundtype = 1;
+				snprintf(temp, 30, "struct _flcn%d", nd_count);
+				td->name = create_string(temp);
+				td->def = 0;
+				snprintf(temp, 30, "_flcn%d", nd_count);
+				td->vname = create_string(temp);
+				
+				d= new dir_decl();
+				snprintf(temp, 30, "_flcn%d", tcnt);
+				d->name = create_string(temp);
 
-			// tree_decl_stmt *tstmt = new tree_decl_stmt();
-			// tstmt->lhs = td;
-			// tstmt->dirrhs = d;
-			statement *st = new statement();
-			st->sttype = DECL_STMT;
-			// st->stdecl = tstmt;
-			st->stdecl = createdeclstmt(td, NULL, d);
+				// tree_decl_stmt *tstmt = new tree_decl_stmt();
+				// tstmt->lhs = td;
+				// tstmt->dirrhs = d;
+				statement *st = new statement();
+				st->sttype = DECL_STMT;
+				// st->stdecl = tstmt;
+				st->stdecl = createdeclstmt(td, NULL, d);
 
-			insert_statement(st1->prev, st, st1);
+				insert_statement(st1->prev, st, st1);
 
-			// assign point to node
-			// lhs of assignment
-			tree_expr *tx = new tree_expr(d);
-			tx->name = create_string(d->name);
-			tx->nodetype = -1;
-			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-			tx->rhs = new tree_expr();
-			tx->rhs->name = create_string("p");
-			tx->rhs->expr_type = VAR;
-			tx->kernel = 5;
-			
-			// assignment operator
-			assign_stmt *as = new assign_stmt();
-			as->asstype = AASSIGN;
-			as->lhs = tx;
-			
-			// rhs of assignment
-			tx = new tree_expr(*ii);
-			tx->name = create_string((*ii)->name);
-			tx->nodetype = -1;
-			tx->kernel = 5;
-			as->rhs = tx;
-			as->semi = 1;
-
-			statement *stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-			stmt1->stmtno = 0;
-			stmt1->stassign = as;
-
-			insert_statement(st1->prev, stmt1, st1);
-
-			// assign props to node
-			for(set<char*, comparator>::iterator jj=props.begin(); jj!=props.end(); jj++) {
+				// assign point to node
 				// lhs of assignment
 				tx = new tree_expr(d);
 				tx->name = create_string(d->name);
 				tx->nodetype = -1;
 				tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 				tx->rhs = new tree_expr();
-				tx->rhs->name = create_string(*jj);
+				tx->rhs->name = create_string("p");
 				tx->rhs->expr_type = VAR;
 				tx->kernel = 5;
 				
@@ -661,18 +657,50 @@ static int mod_minf(statement *cstmt, set<char*,comparator> &props, dir_decl *wk
 				tx = new tree_expr(*ii);
 				tx->name = create_string((*ii)->name);
 				tx->nodetype = -1;
-				tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-				tx->rhs = new tree_expr();
-				tx->rhs->name = create_string(*jj);
-				tx->rhs->expr_type = VAR;
 				tx->kernel = 5;
 				as->rhs = tx;
+				as->semi = 1;
 
 				stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
 				stmt1->stmtno = 0;
 				stmt1->stassign = as;
 
 				insert_statement(st1->prev, stmt1, st1);
+
+				// assign props to node
+				for(set<char*, comparator>::iterator jj=props.begin(); jj!=props.end(); jj++) {
+					// lhs of assignment
+					tx = new tree_expr(d);
+					tx->name = create_string(d->name);
+					tx->nodetype = -1;
+					tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+					tx->rhs = new tree_expr();
+					tx->rhs->name = create_string(*jj);
+					tx->rhs->expr_type = VAR;
+					tx->kernel = 5;
+					
+					// assignment operator
+					assign_stmt *as = new assign_stmt();
+					as->asstype = AASSIGN;
+					as->lhs = tx;
+					
+					// rhs of assignment
+					tx = new tree_expr(*ii);
+					tx->name = create_string((*ii)->name);
+					tx->nodetype = -1;
+					tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+					tx->rhs = new tree_expr();
+					tx->rhs->name = create_string(*jj);
+					tx->rhs->expr_type = VAR;
+					tx->kernel = 5;
+					as->rhs = tx;
+
+					stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+					stmt1->stmtno = 0;
+					stmt1->stassign = as;
+
+					insert_statement(st1->prev, stmt1, st1);
+				}
 			}
 
 			// insert node to worklist
@@ -681,14 +709,21 @@ static int mod_minf(statement *cstmt, set<char*,comparator> &props, dir_decl *wk
 			tx->name = create_string(wklist->name);
 			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 			tx->rhs = new tree_expr();
-			tx->rhs->name = create_string("add");
+			tx->rhs->name = create_string("push");
 			tx->rhs->expr_type = VAR;
 			tx->kernel = 0;
 
 			// argument
-			tree_expr *ex = new tree_expr(d);
-			ex->nodetype = -1;
-			ex->name = create_string(d->name);
+			tree_expr *ex;
+			if(isGPU) {
+				ex = new tree_expr(*ii);
+				ex->nodetype = -1;
+				ex->name = create_string((*ii)->name);
+			} else {
+				ex = new tree_expr(d);
+				ex->nodetype = -1;
+				ex->name = create_string(d->name);
+			}
 
 			tx->rhs = funcallpostfix(tx->rhs, FUNCALL, 0, ex);
 
@@ -1485,7 +1520,7 @@ static pair<dir_decl*,int> change_func(statement *stmt, dir_decl **graph) {
 			tx->name = create_string(wklist->name);
 			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 			tx->rhs = new tree_expr();
-			tx->rhs->name = create_string("add");
+			tx->rhs->name = create_string("push");
 			tx->rhs->expr_type = VAR;
 			tx->kernel = 0;
 
@@ -1519,7 +1554,7 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 				tcall->expr4 = NULL;
 				tcall->itr = 5;
 				assign_stmt *as = tcall->stassign->rhs->arglist;
-				
+		
 				// remove args not required
 				assign_stmt *prev_arg = NULL;
 				int count = 0;
@@ -1550,7 +1585,8 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 				// 	}
 				// }
 				// fprintf(stderr, "COUNT: %d\n", count);
-				
+				as->next = new assign_stmt();
+				as = as->next;
 				as->rhs = new tree_expr(wklist);
 				as->rhs->name = create_string(wklist->name);
 				// as->rhs->it = 5;
@@ -1559,6 +1595,7 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 				tcall->prev = begin->prev;
 				tcall->next = begin->end_stmt->next;
 				begin->end_stmt->next->prev = tcall;
+				wklist->parent = (*graph_decl)->stdecl->dirrhs;
 				return false;
 			}
 			begin = begin->end_stmt;
@@ -1629,7 +1666,6 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 			} else {
 				fprintf(stderr, "%s\n", "EMPTY attrs");
 			}
-			return NULL;
 		}
 	}
 
@@ -1641,6 +1677,7 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 	} else {
 		graph_decl = find_global_graph(head);
 		if(graph_decl == NULL) {
+			fprintf(stderr, "worklist-1681: graph not found\n");
 			return NULL;
 		}
 	}
@@ -1842,7 +1879,7 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 	tx->name = create_string(wklist->name);
 	tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 	tx->rhs = new tree_expr();
-	tx->rhs->name = create_string("add");
+	tx->rhs->name = create_string("push");
 	tx->rhs->expr_type = VAR;
 	tx->kernel = 0;
 

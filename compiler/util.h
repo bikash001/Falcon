@@ -11,6 +11,7 @@
 using namespace std;
 
 extern int falc_ext;
+extern bool isGPU;
 
 struct comparator
 {
@@ -19,8 +20,8 @@ struct comparator
 	}
 };
 
-statement* process(std::map<char*, statement*> &fnames, statement *head);
-bool is_lib_attr(LIBDATATYPE type, const char *name);
+statement* process(std::map<char*, statement*>&, statement*);
+bool is_lib_attr(LIBDATATYPE, const char*);
 
 inline dir_decl* get_parent_graph(dir_decl *dd)
 {

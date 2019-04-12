@@ -3,6 +3,7 @@
 #include<math.h>
 #include "symtabold.h"
 #include "externs.h"
+#include <set>
 
 #include "falctypes.h"
 
@@ -37,6 +38,7 @@ extern tree_expr *binaryopnode(tree_expr *lhs,tree_expr *rhs,enum EXPR_TYPE etyp
 char *vb_forcondarr = NULL;    // stores condition in conditional foreach for vertex based
 extern int stream_count;
 extern bool OMP_NESTED;
+extern std::set<statement*> mod_functions;
 
 void findstructref(dir_decl *d1,tree_expr *expr) {
     if(expr->expr_type==STRUCTREF) {
@@ -679,6 +681,7 @@ void statement::codeGen(FILE *FP1) {
                                 if(repli==0) {
                                     fprintf(FP1,"%s",arr2);
                                     fprintf(FP1,"%s; ",arr);
+
                                 }
                             }
                             if(extra_array[0]!='\0') {
@@ -894,6 +897,26 @@ void statement::codeGen(FILE *FP1) {
         else
         {
             if(d2==NULL)fprintf(FP1,"NULL");
+            else if(d2->libdtype == WORKLIST){
+                fprintf(FP1, "Worklist worklist(%s.npoints, %s.nedges);\n", d2->parent->name, d2->parent->name);
+                fprintf(FP1, "Worklist *gw;\ncudaMalloc(&gw, sizeof(Worklist));\nwhile(!worklist.empty()) {\n\tcudaMemcpy(gw, &worklist, sizeof(Worklist),cudaMemcpyHostToDevice);\n");
+                fprintf(FP1, "\tfor(int kk=0;kk<worklist.size();kk+=%spointkernelblocks*TPB%d){\n\t\t%s<<<%spointkernelblocks,TPB%d>>>(",d2->parent->name,d2->dev_no,this->stassign->rhs->name,d2->parent->name,d2->dev_no);
+                assign_stmt *ta=this->stassign->rhs->arglist;
+                assign_stmt *fa = ta;
+                while(fa != NULL) {
+                    fprintf(stderr, "fa: %s\n", fa->rhs->name);
+                    fa = fa->next;
+                }
+                fprintf(stderr, "%s\n", "done");
+
+                ta=ta->next;
+                while(ta!=NULL && ta->next!=NULL) {
+                    fprintf(FP1,"%s,",ta->rhs->name);
+                    ta=ta->next;
+                }
+                if(ta!=NULL)fprintf(FP1,"%s,kk);",ta->rhs->name);
+                fprintf(FP1,"\n\n\ncudaDeviceSynchronize();\n\n}\n");                
+            }
             if(d2!=NULL &&d2->libdtype==GRAPH_TYPE) {
                 if(it==0) {
                     this->expr1->lhs->libdtype=POINT_TYPE;
@@ -2136,7 +2159,9 @@ void statement::codeGen(FILE *FP1) {
         dir_decl *d1=t1->stdecl->dirrhs;
         tree_decl_stmt  *decl=d1->params;
         dir_decl *d2= decl->dirrhs;
-        fprintf(FP1,"int %s=id;\n",d2->name);
+        if(!(this->prev && mod_functions.find(this->prev) != mod_functions.end())) {
+            fprintf(FP1,"int %s=id;\n",d2->name);
+        }
         if(d2!=NULL) {
             if(d2->parent!=NULL) {
                 if(this->barrier==1 || (this->prev &&this->prev->barrier==1)) {
@@ -2151,10 +2176,13 @@ void statement::codeGen(FILE *FP1) {
                     }
                     sprintf(barr_after,"if(id < ");
                 }
-
-                if(d2->libdtype>=0)fprintf(FP1,"if( id < ");
+                if(d2->libdtype>=0)fprintf(FP1,"if( id < "); 
+            } else if(this->prev && mod_functions.find(this->prev) != mod_functions.end()) {
+                fprintf(FP1, "Worklist &worklist=*%s;\nif(id < worklist.size()", this->prev->stdecl->dirrhs->params->next->dirrhs->name);
             }
-            if(d2->libdtype==POINT_TYPE &&d2->parent->libdtype!=COLLECTION_TYPE)fprintf(FP1,"%s.npoints",d2->parent->name);
+            if(!(this->prev && mod_functions.find(this->prev) != mod_functions.end())) {
+                if(d2->libdtype==POINT_TYPE &&d2->parent->libdtype!=COLLECTION_TYPE)fprintf(FP1,"%s.npoints",d2->parent->name);
+            }
             if(d2->libdtype==EDGE_TYPE) {
                 fprintf(FP1,"%s.nedges",d2->parent->name);
             }
@@ -2208,7 +2236,11 @@ void statement::codeGen(FILE *FP1) {
                 for(int i=0; i<200; i++)forcondarr[i]='\0';
             }
             if(!(this->barrier==1||this->prev->barrier==1)) {
-                fprintf(FP1,"){\n");
+                if(this->prev && mod_functions.find(this->prev) != mod_functions.end()) {
+                    fprintf(FP1, "){\nid = worklist.get(id);\n");
+                } else {
+                    fprintf(FP1,"){\n");
+                }
                 EXTRA_CRBRK=1;
             }
             if(this->barrier==1 || (this->prev &&this->prev->barrier==1))
