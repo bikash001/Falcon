@@ -356,7 +356,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
                 for(int i=0; i<200; i++)extra_array[i]='\0';
             }
             dir_decl *_ext_parent = NULL;
-            if(expr->lhs->lhs && expr->lhs->lhs->libdtype == COLLECTION_TYPE) {
+            if(expr->lhs->lhs && (expr->lhs->lhs->libdtype == COLLECTION_TYPE || expr->lhs->lhs->libdtype == WORKLIST)) {
                 _ext_parent = expr->lhs->lhs->parent;
                 expr->lhs->lhs->parent = NULL;
             }
@@ -1330,7 +1330,7 @@ int tree_expr::printcode1(tree_expr *expr,char *print_string) {
             }
             sref=sref-1;
             GPSREF=0;
-            if(expr->lhs->lhs && expr->lhs->lhs->libdtype == COLLECTION_TYPE) {
+            if(expr->lhs->lhs && (expr->lhs->lhs->libdtype == COLLECTION_TYPE || expr->lhs->lhs->libdtype == WORKLIST)) {
                 expr->lhs->lhs->parent = _ext_parent;
             }
             return;

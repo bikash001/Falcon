@@ -7,6 +7,7 @@
 #include "util.h"
 using namespace std;
 
+map<dir_decl*, map<dir_decl*, set<char*, comparator> > > gtab; // stores gpu graph corresponding to cpu graph
 std::vector<statement*> foreach_list;
 std::vector<statement*> sections_stmts;
 extern char* libdtypenames[10];
@@ -2118,7 +2119,7 @@ void get_variables(bool isGPU, bool cpuParallelSection = false)
 		int stream_no = 1;
 		vector<statement*>::iterator jj = kernels.begin();
 
-		map<dir_decl*, map<dir_decl*, set<char*, comparator> > > tab;
+		map<dir_decl*, map<dir_decl*, set<char*, comparator> > > &tab = gtab;
 		map<dir_decl*, map<dir_decl*, set<char*, comparator> > >::iterator kk;
 
 		vector<statement*>::iterator start = kernels.end(), end = kernels.end();

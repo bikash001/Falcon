@@ -665,6 +665,7 @@ void statement::codeGen(FILE *FP1) {
                             char arr[200];
                             for(int i=0; i<200; i++)arr[i]='\0';
                             this->stassign->rhs->printcode1(this->stassign->rhs,arr);
+
                             dir_decl *d1=this->stassign->rhs;
                             if(d1->parent!=NULL && repli==1) {
                                 fprintf(FP1,"int repli%d=%s;\n",replicnt,arr);
@@ -700,6 +701,7 @@ void statement::codeGen(FILE *FP1) {
                 if(this->stassign->rhs!=NULL && this->stassign->rhs->expr_type==CAST_EXPR) {
                 }
                 if(this->stassign->rhs!=NULL && this->stassign->rhs->expr_type==FUNCALL) {
+                    
                     char arr[200];
                     for(int i=0; i<200; i++)arr[i]='\0';
                     if(this->stassign->lhs!=NULL) {
@@ -898,24 +900,44 @@ void statement::codeGen(FILE *FP1) {
         {
             if(d2==NULL)fprintf(FP1,"NULL");
             else if(d2->libdtype == WORKLIST){
+                assign_stmt *ta=this->stassign->rhs->arglist;
+                char *gname = NULL;
+                while(ta!=NULL) {
+                    if(ta->rhs->libdtype == GRAPH_TYPE) {
+                        gname = ta->rhs->name;
+                        break;
+                    }
+                    ta=ta->next;
+                }
                 fprintf(FP1, "Worklist worklist(%s.npoints, %s.nedges);\n", d2->parent->name, d2->parent->name);
                 fprintf(FP1, "Worklist *gw;\ncudaMalloc(&gw, sizeof(Worklist));\nwhile(!worklist.empty()) {\n\tcudaMemcpy(gw, &worklist, sizeof(Worklist),cudaMemcpyHostToDevice);\n");
-                fprintf(FP1, "\tfor(int kk=0;kk<worklist.size();kk+=%spointkernelblocks*TPB%d){\n\t\t%s<<<%spointkernelblocks,TPB%d>>>(",d2->parent->name,d2->dev_no,this->stassign->rhs->name,d2->parent->name,d2->dev_no);
-                assign_stmt *ta=this->stassign->rhs->arglist;
-                assign_stmt *fa = ta;
-                while(fa != NULL) {
-                    fprintf(stderr, "fa: %s\n", fa->rhs->name);
-                    fa = fa->next;
-                }
-                fprintf(stderr, "%s\n", "done");
+                fprintf(FP1, "\tfor(int kk=0;kk<worklist.size();kk+=%spointkernelblocks*TPB%d){\n\t\t%s<<<%spointkernelblocks,TPB%d>>>(",gname,d2->dev_no,this->stassign->rhs->name,gname,d2->dev_no);
+                
+                ta=this->stassign->rhs->arglist;
+                // assign_stmt *fa = ta;
+                // while(fa != NULL) {
+                //     fprintf(stderr, "fa: %s\n", fa->rhs->name);
+                //     fa = fa->next;
+                // }
+                // fprintf(stderr, "%s\n", "done");
 
                 ta=ta->next;
                 while(ta!=NULL && ta->next!=NULL) {
-                    fprintf(FP1,"%s,",ta->rhs->name);
+                    if(ta->rhs->libdtype == WORKLIST) {
+                        fprintf(FP1,"gw,");
+                    } else {
+                        fprintf(FP1,"%s,",ta->rhs->name);
+                    }
                     ta=ta->next;
                 }
-                if(ta!=NULL)fprintf(FP1,"%s,kk);",ta->rhs->name);
-                fprintf(FP1,"\n\n\ncudaDeviceSynchronize();\n\n}\n");                
+                if(ta!=NULL) {
+                    if(ta->rhs->libdtype == WORKLIST) {
+                        fprintf(FP1,"gw,kk);");
+                    } else {
+                        fprintf(FP1,"%s,kk);",ta->rhs->name);
+                    }
+                }
+                fprintf(FP1,"\n\t}\n\tcudaDeviceSynchronize();\n\tcudaMemcpy(&worklist, gw, sizeof(Worklist), cudaMemcpyDeviceToHost);\n\tworklist.swap();\n}\n");
             }
             if(d2!=NULL &&d2->libdtype==GRAPH_TYPE) {
                 if(it==0) {

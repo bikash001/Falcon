@@ -508,7 +508,12 @@ static int mod_if(statement *ifstmt, set<char*, comparator> &props, dir_decl *wk
 			// insert node to worklist
 			tx = new tree_expr(wklist);
 			tx->nodetype = -10;
-			tx->name = create_string(wklist->name);
+			if(isGPU) {
+				snprintf(temp, 30, "(*%s)", wklist->name);
+				tx->name = create_string(temp);
+			} else {
+				tx->name = create_string(wklist->name);
+			}
 			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 			tx->rhs = new tree_expr();
 			tx->rhs->name = create_string("push");
@@ -706,7 +711,12 @@ static int mod_minf(statement *cstmt, set<char*,comparator> &props, dir_decl *wk
 			// insert node to worklist
 			tx = new tree_expr(wklist);
 			tx->nodetype = -10;
-			tx->name = create_string(wklist->name);
+			if(isGPU) {
+				snprintf(temp, 30, "(*%s)", wklist->name);
+				tx->name = create_string(temp);
+			} else {
+				tx->name = create_string(wklist->name);
+			}
 			tx = binaryopnode(tx, NULL, STRUCTREF, -1);
 			tx->rhs = new tree_expr();
 			tx->rhs->name = create_string("push");
@@ -1558,7 +1568,9 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 				// remove args not required
 				assign_stmt *prev_arg = NULL;
 				int count = 0;
-				while(as->next) as = as->next;
+				while(as->next){ 
+					as = as->next;
+				}
 				// while(as) {
 				// 	if(as->rhs->expr_type == VAR) {
 				// 		if(as->rhs->lhs->libdtype != POINT_TYPE || as->rhs->lhs->libdtype != GRAPH_TYPE) {
@@ -1585,6 +1597,7 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 				// 	}
 				// }
 				// fprintf(stderr, "COUNT: %d\n", count);
+				
 				as->next = new assign_stmt();
 				as = as->next;
 				as->rhs = new tree_expr(wklist);
@@ -1602,7 +1615,7 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 		} else if(begin->sttype == DECL_STMT) {
 			if(begin->stdecl->lhs->libdatatype == GRAPH_TYPE && graph_decl != NULL) {
 				*graph_decl = begin;
-				fprintf(stderr, "%s\n", "GRAPH FOUND");
+				// fprintf(stderr, "%s\n", "GRAPH FOUND");
 			}
 		} else if(begin->sttype == FOREACH_STMT && begin->stassign != NULL) {
 			if(strcmp(begin->stassign->rhs->name, fnc) == 0) {
@@ -1669,231 +1682,233 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 		}
 	}
 
-	// move graph declaration to top.
-	if(graph_decl != NULL) {
-		graph_decl->prev->next = graph_decl->next;
-		graph_decl->next->prev = graph_decl->prev;
-		insert_statement(head, graph_decl, head->next);
-	} else {
-		graph_decl = find_global_graph(head);
-		if(graph_decl == NULL) {
-			fprintf(stderr, "worklist-1681: graph not found\n");
-			return NULL;
+	if(isGPU == 0) {
+		// move graph declaration to top.
+		if(graph_decl != NULL) {
+			graph_decl->prev->next = graph_decl->next;
+			graph_decl->next->prev = graph_decl->prev;
+			insert_statement(head, graph_decl, head->next);
+		} else {
+			graph_decl = find_global_graph(head);
+			if(graph_decl == NULL) {
+				fprintf(stderr, "worklist-1681: graph not found\n");
+				return NULL;
+			}
 		}
+		
+		// Define struct node
+		char temp[50];
+		tree_typedecl *tp = new tree_typedecl();
+		tp->datatype = STRUCT_TYPE;
+		tp->compoundtype = 1;
+		snprintf(temp, 50, "struct _flcn%d", cnt);
+		tp->name = create_string(temp);
+		tp->def = 1;
+		snprintf(temp, 50, "_flcn%d", cnt);
+		tp->vname = create_string(temp);
+
+		// struct_declaration_list
+		tree_typedecl *td = new tree_typedecl();
+		td->libdatatype = POINT_TYPE;
+		td->name = create_string("point ");
+		dir_decl *d = new dir_decl();
+		d->name = create_string("p");
+		tree_decl_stmt *tds = createdeclstmt(td, NULL, d);
+		d->ppts = graph->ppts;
+
+		td = new tree_typedecl();
+		td->datatype = INT_TYPE;
+		td->name = create_string("int ");
+		d = new dir_decl();
+		d->name = create_string("dist");
+		tds->next = createdeclstmt(td, NULL, d);
+
+		tp->list = tds;
+		statement *stmt = new statement();
+		stmt->sttype = DECL_STMT;
+		stmt->stdecl = createdeclstmt(tp, NULL, NULL);
+
+		stmt->next = head;
+		head->prev = stmt;
+		head = stmt;
+
+
+		// Define collection
+		tp = new tree_typedecl();
+		tp->libdatatype = COLLECTION_TYPE;
+		tp->name = create_string("collection");
+		d = new dir_decl();
+		d->isparam = true;
+		d->libdtype = COLLECTION_TYPE;
+		d->name = create_string(wklist->name);
+		tds = createdeclstmt(tp, NULL, d);
+		stmt = new statement();
+		stmt->sttype = DECL_STMT;
+		stmt->stdecl = tds;	
+
+		tree_typedecl *p = new tree_typedecl();
+		p->datatype = STRUCT_TYPE;
+		p->compoundtype = 1;
+		snprintf(temp, 30, "struct _flcn%d", cnt);
+		p->name = create_string(temp);
+		p->def = 0;
+		snprintf(temp, 30, "_flcn%d", cnt);
+		p->vname = create_string(temp);
+		d->tp1 = p;
+
+		insert_statement(head, stmt, head->next);
+
+		// insert OrderByIntValue
+		tree_expr *tx = new tree_expr(wklist);
+		tx->name = create_string(wklist->name);
+		tx->lhs->ordered = true;
+		tree_expr *bx = binaryopnode(tx, NULL, STRUCTREF, -1);
+		bx->rhs = new tree_expr();
+		bx->rhs->name = create_string("OrderByIntValue");
+		bx->rhs->expr_type = FUNCALL;
+		bx->kernel = 0;
+		bx->nodetype = -10;
+
+		// assignment_expression	
+		tree_expr *t = new tree_expr();
+		t->name = create_string("dist");
+		t->nodetype = -10;
+
+		assign_stmt *as = createassignlhsrhs(-1, NULL, t);
+		t = binaryopnode(NULL, NULL, -1, TREE_INT);
+		t->ival = 2;
+		t->dtype = 0;
+		as->next = createassignlhsrhs(-1, NULL, t);
+		bx->kernel = 0;
+		bx->rhs->arglist = as;
+
+		stmt = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+		stmt->stassign = createassignlhsrhs(-1, NULL, bx);
+
+		insert_statement(main->next, stmt, main->next->next);
+
+		// insert start node to worklist
+		
+		// type specifier
+		td = new tree_typedecl();
+		td->datatype = STRUCT_TYPE;
+		td->compoundtype = 1;
+		snprintf(temp, 30, "struct _flcn%d", cnt);
+		td->name = create_string(temp);
+		td->def = 0;
+		snprintf(temp, 30, "_flcn%d", cnt);
+		td->vname = create_string(temp);
+		
+		int tcnt = falc_ext++;
+		d= new dir_decl();
+		snprintf(temp, 30, "_flcn%d", tcnt);
+		d->name = create_string(temp);
+
+		tree_decl_stmt *tstmt = new tree_decl_stmt();
+		tstmt->lhs = td;
+		tstmt->dirrhs = d;
+		statement *st = new statement();
+		st->sttype = DECL_STMT;
+		st->stdecl = tstmt;
+
+		insert_statement(stmt, st, stmt->next);
+		stmt = st;
+
+
+		// assign point to node
+		// lhs of assignment
+		tx = new tree_expr(d);
+		tx->name = create_string(d->name);
+		tx->nodetype = -1;
+		tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+		tx->rhs = new tree_expr();
+		tx->rhs->name = create_string("p");
+		tx->rhs->expr_type = VAR;
+		tx->kernel = 5;
+		
+		// assignment operator
+		as = new assign_stmt();
+		as->asstype = AASSIGN;
+		as->lhs = tx;
+		
+		// rhs of assignment
+		tx = new tree_expr(graph);
+		tx->name = create_string(graph->name);
+		tx->nodetype = -10;
+		tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+		tx->rhs = new tree_expr();
+		tx->rhs->name = create_string("points");
+		tx->rhs->expr_type = ARRREF;
+		tx->kernel = 0;
+
+		// array exp
+		t = binaryopnode(NULL, NULL, -1, TREE_INT);
+		t->ival = 0;
+		t->dtype = 0;
+		assign_stmt *as2 = createassignlhsrhs(-1, NULL, t);
+		tx->rhs->earr_list = as2;
+
+		as->rhs = tx;
+
+		statement *stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+		stmt1->stmtno = 0;
+		stmt1->stassign = as;
+
+		insert_statement(stmt, stmt1, stmt->next);
+		stmt = stmt1;
+
+
+		// assign props
+		tx = new tree_expr(d);
+		tx->name = create_string(d->name);
+		tx->nodetype = -1;
+		tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+		tx->rhs = new tree_expr();
+		tx->rhs->name = create_string("dist");
+		tx->rhs->expr_type = VAR;
+		tx->kernel = 5;
+		
+		// assignment operator
+		as = new assign_stmt();
+		as->asstype = AASSIGN;
+		as->lhs = tx;
+		as->semi = 1;
+
+		// rhs of assignment
+		tx = binaryopnode(NULL, NULL, -1, TREE_INT);
+		tx->ival = 0;
+		tx->dtype = 0;
+		
+		as->rhs = tx;
+
+		stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+		stmt1->stmtno = 0;
+		stmt1->stassign = as;
+
+		insert_statement(stmt, stmt1, stmt->next);
+		stmt = stmt1;
+
+		tx = new tree_expr(wklist);
+		tx->nodetype = -10;
+		tx->name = create_string(wklist->name);
+		tx = binaryopnode(tx, NULL, STRUCTREF, -1);
+		tx->rhs = new tree_expr();
+		tx->rhs->name = create_string("push");
+		tx->rhs->expr_type = VAR;
+		tx->kernel = 0;
+
+		// argument
+		tree_expr *ex = new tree_expr(d);
+		ex->nodetype = -1;
+		ex->name = create_string(d->name);
+
+		tx->rhs = funcallpostfix(tx->rhs, FUNCALL, 0, ex);
+
+		stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
+		stmt1->stassign = createassignlhsrhs(-1, NULL, tx);
+
+		insert_statement(stmt, stmt1, stmt->next);
 	}
-
-	// Define struct node
-	char temp[50];
-	tree_typedecl *tp = new tree_typedecl();
-	tp->datatype = STRUCT_TYPE;
-	tp->compoundtype = 1;
-	snprintf(temp, 50, "struct _flcn%d", cnt);
-	tp->name = create_string(temp);
-	tp->def = 1;
-	snprintf(temp, 50, "_flcn%d", cnt);
-	tp->vname = create_string(temp);
-
-	// struct_declaration_list
-	tree_typedecl *td = new tree_typedecl();
-	td->libdatatype = POINT_TYPE;
-	td->name = create_string("point ");
-	dir_decl *d = new dir_decl();
-	d->name = create_string("p");
-	tree_decl_stmt *tds = createdeclstmt(td, NULL, d);
-	d->ppts = graph->ppts;
-
-	td = new tree_typedecl();
-	td->datatype = INT_TYPE;
-	td->name = create_string("int ");
-	d = new dir_decl();
-	d->name = create_string("dist");
-	tds->next = createdeclstmt(td, NULL, d);
-
-	tp->list = tds;
-	statement *stmt = new statement();
-	stmt->sttype = DECL_STMT;
-	stmt->stdecl = createdeclstmt(tp, NULL, NULL);
-
-	stmt->next = head;
-	head->prev = stmt;
-	head = stmt;
-
-
-	// Define collection
-	tp = new tree_typedecl();
-	tp->libdatatype = COLLECTION_TYPE;
-	tp->name = create_string("collection");
-	d = new dir_decl();
-	d->isparam = true;
-	d->libdtype = COLLECTION_TYPE;
-	d->name = create_string(wklist->name);
-	tds = createdeclstmt(tp, NULL, d);
-	stmt = new statement();
-	stmt->sttype = DECL_STMT;
-	stmt->stdecl = tds;	
-
-	tree_typedecl *p = new tree_typedecl();
-	p->datatype = STRUCT_TYPE;
-	p->compoundtype = 1;
-	snprintf(temp, 30, "struct _flcn%d", cnt);
-	p->name = create_string(temp);
-	p->def = 0;
-	snprintf(temp, 30, "_flcn%d", cnt);
-	p->vname = create_string(temp);
-	d->tp1 = p;
-
-	insert_statement(head, stmt, head->next);
-
-	// insert OrderByIntValue
-	tree_expr *tx = new tree_expr(wklist);
-	tx->name = create_string(wklist->name);
-	tx->lhs->ordered = true;
-	tree_expr *bx = binaryopnode(tx, NULL, STRUCTREF, -1);
-	bx->rhs = new tree_expr();
-	bx->rhs->name = create_string("OrderByIntValue");
-	bx->rhs->expr_type = FUNCALL;
-	bx->kernel = 0;
-	bx->nodetype = -10;
-
-	// assignment_expression	
-	tree_expr *t = new tree_expr();
-	t->name = create_string("dist");
-	t->nodetype = -10;
-
-	assign_stmt *as = createassignlhsrhs(-1, NULL, t);
-	t = binaryopnode(NULL, NULL, -1, TREE_INT);
-	t->ival = 2;
-	t->dtype = 0;
-	as->next = createassignlhsrhs(-1, NULL, t);
-	bx->kernel = 0;
-	bx->rhs->arglist = as;
-
-	stmt = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-	stmt->stassign = createassignlhsrhs(-1, NULL, bx);
-
-	insert_statement(main->next, stmt, main->next->next);
-
-	// insert start node to worklist
-	
-	// type specifier
-	td = new tree_typedecl();
-	td->datatype = STRUCT_TYPE;
-	td->compoundtype = 1;
-	snprintf(temp, 30, "struct _flcn%d", cnt);
-	td->name = create_string(temp);
-	td->def = 0;
-	snprintf(temp, 30, "_flcn%d", cnt);
-	td->vname = create_string(temp);
-	
-	int tcnt = falc_ext++;
-	d= new dir_decl();
-	snprintf(temp, 30, "_flcn%d", tcnt);
-	d->name = create_string(temp);
-
-	tree_decl_stmt *tstmt = new tree_decl_stmt();
-	tstmt->lhs = td;
-	tstmt->dirrhs = d;
-	statement *st = new statement();
-	st->sttype = DECL_STMT;
-	st->stdecl = tstmt;
-
-	insert_statement(stmt, st, stmt->next);
-	stmt = st;
-
-
-	// assign point to node
-	// lhs of assignment
-	tx = new tree_expr(d);
-	tx->name = create_string(d->name);
-	tx->nodetype = -1;
-	tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-	tx->rhs = new tree_expr();
-	tx->rhs->name = create_string("p");
-	tx->rhs->expr_type = VAR;
-	tx->kernel = 5;
-	
-	// assignment operator
-	as = new assign_stmt();
-	as->asstype = AASSIGN;
-	as->lhs = tx;
-	
-	// rhs of assignment
-	tx = new tree_expr(graph);
-	tx->name = create_string(graph->name);
-	tx->nodetype = -10;
-	tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-	tx->rhs = new tree_expr();
-	tx->rhs->name = create_string("points");
-	tx->rhs->expr_type = ARRREF;
-	tx->kernel = 0;
-
-	// array exp
-	t = binaryopnode(NULL, NULL, -1, TREE_INT);
-	t->ival = 0;
-	t->dtype = 0;
-	assign_stmt *as2 = createassignlhsrhs(-1, NULL, t);
-	tx->rhs->earr_list = as2;
-
-	as->rhs = tx;
-
-	statement *stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-	stmt1->stmtno = 0;
-	stmt1->stassign = as;
-
-	insert_statement(stmt, stmt1, stmt->next);
-	stmt = stmt1;
-
-
-	// assign props
-	tx = new tree_expr(d);
-	tx->name = create_string(d->name);
-	tx->nodetype = -1;
-	tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-	tx->rhs = new tree_expr();
-	tx->rhs->name = create_string("dist");
-	tx->rhs->expr_type = VAR;
-	tx->kernel = 5;
-	
-	// assignment operator
-	as = new assign_stmt();
-	as->asstype = AASSIGN;
-	as->lhs = tx;
-	as->semi = 1;
-
-	// rhs of assignment
-	tx = binaryopnode(NULL, NULL, -1, TREE_INT);
-	tx->ival = 0;
-	tx->dtype = 0;
-	
-	as->rhs = tx;
-
-	stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-	stmt1->stmtno = 0;
-	stmt1->stassign = as;
-
-	insert_statement(stmt, stmt1, stmt->next);
-	stmt = stmt1;
-
-	tx = new tree_expr(wklist);
-	tx->nodetype = -10;
-	tx->name = create_string(wklist->name);
-	tx = binaryopnode(tx, NULL, STRUCTREF, -1);
-	tx->rhs = new tree_expr();
-	tx->rhs->name = create_string("push");
-	tx->rhs->expr_type = VAR;
-	tx->kernel = 0;
-
-	// argument
-	tree_expr *ex = new tree_expr(d);
-	ex->nodetype = -1;
-	ex->name = create_string(d->name);
-
-	tx->rhs = funcallpostfix(tx->rhs, FUNCALL, 0, ex);
-
-	stmt1 = createstmt(ASSIGN_STMT, NULL, NULL, 0);
-	stmt1->stassign = createassignlhsrhs(-1, NULL, tx);
-
-	insert_statement(stmt, stmt1, stmt->next);
 
 	return head;
 }
