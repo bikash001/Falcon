@@ -1608,6 +1608,15 @@ static bool walk_statement(statement *begin, statement *end, char *fnc, statemen
 				tcall->prev = begin->prev;
 				tcall->next = begin->end_stmt->next;
 				begin->end_stmt->next->prev = tcall;
+				// if(graph_decl == NULL) {
+				// 	fprintf(stderr, "%s\n", "TEST ERROR");
+				// } else if((*graph_decl)->stdecl == NULL) {
+				// 	fprintf(stderr, "%s\n", "TEST ERROR 2");
+				// }else if((*graph_decl)->stdecl->dirrhs == NULL) {
+				// 	fprintf(stderr, "%s\n", "TEST ERROR 3");
+				// }else if(wklist == NULL) {
+				// 	fprintf(stderr, "%s\n", "TEST ERROR 4");
+				// }
 				wklist->parent = (*graph_decl)->stdecl->dirrhs;
 				return false;
 			}
@@ -1661,12 +1670,14 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 	int cnt = 0;
 	dir_decl *wklist = NULL;
 	statement *graph_decl = NULL;
+	bool chng = false;
+
 	for(std::map<char*, statement*>::iterator it=fnames.begin(); it!=fnames.end(); it++) {
-		fprintf(stderr, "CHECKING %s\n", it->first);
+		// fprintf(stderr, "CHECKING %s\n", it->first);
 		pair<dir_decl*, int> pr;
 		if(check_func(it->second, main, &graph, pr)) { // check if it satisfies pre-condition
 			// remove_code(it->first);
-			fprintf(stderr, "FOUND %s\n", it->first);
+			// fprintf(stderr, "FOUND %s\n", it->first);
 			// pair<dir_decl*, int> pr = change_func(it->second, &graph);
 			cnt = pr.second;
 			if(pr.first) {
@@ -1676,13 +1687,14 @@ statement* process(map<char*, statement*> &fnames, statement *head) {
 
 				// remove while loop from main function
 				walk_statement(main, main->end_stmt, it->first, &call, pr.first, &graph_decl);
+				chng = true;
 			} else {
-				fprintf(stderr, "%s\n", "EMPTY attrs");
+				// fprintf(stderr, "%s\n", "EMPTY attrs");
 			}
 		}
 	}
 
-	if(isGPU == 0) {
+	if(isGPU == 0 && chng) {
 		// move graph declaration to top.
 		if(graph_decl != NULL) {
 			graph_decl->prev->next = graph_decl->next;

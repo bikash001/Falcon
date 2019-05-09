@@ -1246,7 +1246,7 @@ void assign_stmt::print1(bool semi) {
     if(ariflag && this->lhs && this->lhs->libdtype>=0 &&this->lhs->libdtype!=this->rhs->libdtype) {
         if(ERRPRINT)
             fprintf(stderr,"MISMATCH between left libtype=%s and right type\n",libdtypenames[this->lhs->libdtype]);
-        errflag=1;
+        // errflag=1;
     }
 
 
